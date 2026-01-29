@@ -1,0 +1,10 @@
+.idea
+
+go.sum
+
+docs-site/node_modules
+docs-site/.docusaurus
+docs-site/.cache
+docs-site/build
+node_modules
+.vscode
