@@ -18,6 +18,5 @@ export * from "./types";
 
 // Legacy store (maintained for backwards compatibility)
 // Note: These use @/store/ path alias, not relative paths
-export { gameReducer } from "@/store/gameReducer";
 export { GameContext, useGame } from "@/store/gameContext";
 export { GameProvider } from "@/store/GameProvider";
