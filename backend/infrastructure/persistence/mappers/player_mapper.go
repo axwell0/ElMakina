@@ -8,12 +8,13 @@ import (
 // PlayerToModel converts a domain Player to a GORM model.
 func PlayerToModel(player *entities.Player) *models.PlayerModel {
 	return &models.PlayerModel{
-		ID:        player.ID().String(),
-		Nick:      player.Nick(),
-		Token:     player.Token(),
-		Avatar:    player.Avatar(),
-		CreatedAt: player.CreatedAt(),
-		UpdatedAt: player.UpdatedAt(),
+		ID:           player.ID().String(),
+		Nick:         player.Nick(),
+		Token:        player.Token(),
+		Avatar:       player.Avatar(),
+		CreatedAt:    player.CreatedAt(),
+		UpdatedAt:    player.UpdatedAt(),
+		LastActiveAt: player.LastActiveAt(),
 	}
 }
 
@@ -26,6 +27,7 @@ func PlayerToEntity(model *models.PlayerModel) *entities.Player {
 		model.Avatar,
 		model.CreatedAt,
 		model.UpdatedAt,
+		model.LastActiveAt,
 	)
 }
 

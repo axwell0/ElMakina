@@ -1,3 +1,4 @@
+/* eslint-disable */
 /**
  * This file is auto-generated from the backend WebSocket schema.
  * Source: shared/schemas/envelope.json

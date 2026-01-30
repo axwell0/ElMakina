@@ -13,12 +13,13 @@ func (id PlayerID) String() string { return string(id) }
 // Player represents a human participant in the game.
 // This is a pure domain entity with no persistence concerns.
 type Player struct {
-	id        PlayerID
-	nick      string
-	token     string // Secret reconnection token
-	avatar    string
-	createdAt time.Time
-	updatedAt time.Time
+	id           PlayerID
+	nick         string
+	token        string // Secret reconnection token
+	avatar       string
+	createdAt    time.Time
+	updatedAt    time.Time
+	lastActiveAt time.Time // Tracks activity for pruning
 }
 
 // NewPlayer creates a new player with validation.
@@ -38,24 +39,26 @@ func NewPlayer(id PlayerID, nick, token string) (*Player, error) {
 
 	now := time.Now().UTC()
 	return &Player{
-		id:        id,
-		nick:      nick,
-		token:     token,
-		createdAt: now,
-		updatedAt: now,
+		id:           id,
+		nick:         nick,
+		token:        token,
+		createdAt:    now,
+		updatedAt:    now,
+		lastActiveAt: now,
 	}, nil
 }
 
 // ReconstitutePlayer reconstructs a player from persistence (no validation).
 // Use only within repository mappers.
-func ReconstitutePlayer(id PlayerID, nick, token, avatar string, createdAt, updatedAt time.Time) *Player {
+func ReconstitutePlayer(id PlayerID, nick, token, avatar string, createdAt, updatedAt, lastActiveAt time.Time) *Player {
 	return &Player{
-		id:        id,
-		nick:      nick,
-		token:     token,
-		avatar:    avatar,
-		createdAt: createdAt,
-		updatedAt: updatedAt,
+		id:           id,
+		nick:         nick,
+		token:        token,
+		avatar:       avatar,
+		createdAt:    createdAt,
+		updatedAt:    updatedAt,
+		lastActiveAt: lastActiveAt,
 	}
 }
 
@@ -77,10 +80,19 @@ func (p *Player) CreatedAt() time.Time { return p.createdAt }
 // UpdatedAt returns the last update timestamp.
 func (p *Player) UpdatedAt() time.Time { return p.updatedAt }
 
+// LastActiveAt returns the last activity timestamp.
+func (p *Player) LastActiveAt() time.Time { return p.lastActiveAt }
+
 // SetAvatar updates the player's avatar.
 func (p *Player) SetAvatar(avatar string) {
 	p.avatar = avatar
 	p.updatedAt = time.Now().UTC()
+}
+
+// TouchActivity updates the last active timestamp.
+func (p *Player) TouchActivity() {
+	p.lastActiveAt = time.Now().UTC()
+	p.updatedAt = p.lastActiveAt
 }
 
 // CanAuthenticate verifies if the provided token matches.

@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"context"
+	"time"
 
 	"ElMakina/backend/domain/entities"
 )
@@ -31,4 +32,13 @@ type PlayerRepository interface {
 
 	// Exists checks if a player with the given ID exists.
 	Exists(ctx context.Context, id entities.PlayerID) (bool, error)
+
+	// ListInactive retrieves players who have been inactive since the given time.
+	// Returns empty slice (not error) if no inactive players found.
+	ListInactive(ctx context.Context, since time.Time) ([]*entities.Player, error)
+
+	// DeleteBatch removes multiple players in a single operation.
+	// Returns the number of players actually deleted.
+	// Does not return error for non-existent players (idempotent).
+	DeleteBatch(ctx context.Context, ids []entities.PlayerID) (int, error)
 }

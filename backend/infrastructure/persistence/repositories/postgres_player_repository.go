@@ -3,6 +3,7 @@ package repositories
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"ElMakina/backend/domain/entities"
 	"ElMakina/backend/domain/repositories"
@@ -112,4 +113,38 @@ func (r *postgresPlayerRepository) Exists(ctx context.Context, id entities.Playe
 		return false, fmt.Errorf("failed to check player existence: %w", result.Error)
 	}
 	return count > 0, nil
+}
+
+// ListInactive retrieves players who have been inactive since the given time.
+func (r *postgresPlayerRepository) ListInactive(ctx context.Context, since time.Time) ([]*entities.Player, error) {
+	var modelsList []models.PlayerModel
+	result := r.getDB(ctx).Where("last_active_at < ?", since).Find(&modelsList)
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to list inactive players: %w", result.Error)
+	}
+
+	players := make([]*entities.Player, len(modelsList))
+	for i, model := range modelsList {
+		players[i] = mappers.PlayerToEntity(&model)
+	}
+	return players, nil
+}
+
+// DeleteBatch removes multiple players in a single operation.
+func (r *postgresPlayerRepository) DeleteBatch(ctx context.Context, ids []entities.PlayerID) (int, error) {
+	if len(ids) == 0 {
+		return 0, nil
+	}
+
+	idStrings := make([]string, len(ids))
+	for i, id := range ids {
+		idStrings[i] = id.String()
+	}
+
+	result := r.getDB(ctx).Where("id IN ?", idStrings).Delete(&models.PlayerModel{})
+	if result.Error != nil {
+		return 0, fmt.Errorf("failed to delete players: %w", result.Error)
+	}
+
+	return int(result.RowsAffected), nil
 }
