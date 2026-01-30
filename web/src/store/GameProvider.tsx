@@ -1,41 +1,47 @@
 import React, {useEffect, useReducer} from 'react';
-import {initialGameState} from './types';
-import {gameReducer} from './gameReducer';
 import {socket} from '../network/socket';
 import {GameContext} from './gameContext';
+import { localStorageAdapter, STORAGE_KEYS } from '@/state/persistence';
+import { rootReducer, initialSlicedState, toGameState, type SlicedGameState } from '@/state/slices';
+
+function loadPersistedState(init: SlicedGameState): SlicedGameState {
+    if (!localStorageAdapter.isAvailable()) return init;
+
+    const storedMute = localStorageAdapter.getItem(STORAGE_KEYS.sfxMuted);
+    const storedTheme = localStorageAdapter.getItem(STORAGE_KEYS.theme) as "light" | "dark" | null;
+    const storedReplays = localStorageAdapter.getItem(STORAGE_KEYS.replayHistory);
+
+    const next: SlicedGameState = { ...init };
+    
+    if (storedMute !== null) {
+        next.ui = { ...next.ui, sfxMuted: storedMute === "true" };
+    }
+    if (storedTheme !== null) {
+        next.ui = { ...next.ui, theme: storedTheme };
+    } else {
+        // Default to dark for the signature tabletop feel
+        next.ui = { ...next.ui, theme: "dark" };
+    }
+    if (storedReplays) {
+        try {
+            const parsed = JSON.parse(storedReplays);
+            if (Array.isArray(parsed)) {
+                next.ui = { ...next.ui, replayHistory: parsed };
+            }
+        } catch {
+            next.ui = { ...next.ui, replayHistory: [] };
+        }
+    }
+    return next;
+}
 
 export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const stateRef = React.useRef(initialGameState);
-    const [state, dispatch] = useReducer(gameReducer, initialGameState, (init) => {
-        if (typeof window === "undefined") return init;
-
-        const storedMute = localStorage.getItem("elmakina.sfxMuted");
-        const storedTheme = localStorage.getItem("elmakina.theme") as "light" | "dark" | null;
-        const storedReplays = localStorage.getItem("elmakina.replayHistory");
-
-        const next = { ...init };
-        if (storedMute !== null) {
-            next.sfxMuted = storedMute === "true";
-        }
-        if (storedTheme !== null) {
-            next.theme = storedTheme;
-        } else {
-            // Default to dark for the signature tabletop feel
-            next.theme = "dark";
-        }
-        if (storedReplays) {
-            try {
-                const parsed = JSON.parse(storedReplays);
-                if (Array.isArray(parsed)) {
-                    next.replayHistory = parsed;
-                }
-            } catch {
-                next.replayHistory = [];
-            }
-        }
-        return next;
-    });
-
+    const [slicedState, dispatch] = useReducer(rootReducer, initialSlicedState, loadPersistedState);
+    
+    // Convert sliced state to flat GameState for backwards compatibility
+    const state = toGameState(slicedState);
+    const stateRef = React.useRef(state);
+    
     useEffect(() => {
         stateRef.current = state;
     }, [state]);
@@ -78,21 +84,21 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
     }, []);
 
+    // Persist state changes to storage
     useEffect(() => {
-        if (typeof window !== "undefined") {
-            localStorage.setItem("elmakina.sfxMuted", String(state.sfxMuted));
-        }
+        localStorageAdapter.setItem(STORAGE_KEYS.sfxMuted, String(state.sfxMuted));
     }, [state.sfxMuted]);
 
     useEffect(() => {
-        if (typeof window !== "undefined") {
-            localStorage.setItem("elmakina.theme", state.theme);
-        }
+        localStorageAdapter.setItem(STORAGE_KEYS.theme, state.theme);
     }, [state.theme]);
 
     useEffect(() => {
-        if (typeof window !== "undefined") {
-            localStorage.setItem("elmakina.replayHistory", JSON.stringify(state.replayHistory));
+        try {
+            const serialized = JSON.stringify(state.replayHistory);
+            localStorageAdapter.setItem(STORAGE_KEYS.replayHistory, serialized);
+        } catch (error) {
+            console.warn("Failed to persist replay history:", error);
         }
     }, [state.replayHistory]);
 
@@ -100,6 +106,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (typeof window === "undefined") return;
         if (process.env.NODE_ENV === "production") return;
         window.__ELMAKINA_DEV__ = {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             dispatch: dispatch as any,
             getState: () => stateRef.current,
             sendEnvelope: (envelope) => dispatch({ type: "MESSAGE", envelope }),

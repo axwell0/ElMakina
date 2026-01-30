@@ -1,10 +1,10 @@
 import React, {createContext, useContext} from 'react';
 import {GameState, initialGameState} from './types';
-import type {Action} from './gameReducer';
+import type {RootAction} from '@/state/slices';
 
 export interface GameContextType {
     state: GameState;
-    dispatch: React.Dispatch<Action>;
+    dispatch: React.Dispatch<RootAction>;
 }
 
 export const GameContext = createContext<GameContextType>({
