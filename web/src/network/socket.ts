@@ -1,7 +1,7 @@
 import type {ErrorObject} from 'ajv';
 import Ajv2020 from 'ajv/dist/2020';
-import wsSchema from './ws-schema.json';
-import type {ElMakinaWebSocketEnvelope} from './ws-contract';
+import wsSchema from '@/network/ws-schema.json';
+import type {ElMakinaWebSocketEnvelope} from '@/network/ws-contract';
 
 export type RequestId = string;
 export type WsEnvelope = ElMakinaWebSocketEnvelope;
