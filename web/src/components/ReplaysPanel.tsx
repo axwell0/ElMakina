@@ -57,7 +57,7 @@ export function ReplaysPanel({ playerId, replays }: ReplaysPanelProps) {
                 return;
             }
             setManualError(null);
-            router.push(`/replay/${matchId}?viewer_id=${encodeURIComponent(playerId)}` as any);
+            router.push(`/replay/${matchId}?viewer_id=${encodeURIComponent(playerId)}`);
         },
         [eligibleReplays, playerId, router]
     );

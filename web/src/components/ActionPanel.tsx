@@ -11,6 +11,12 @@ type ActionPanelProps = {
     className?: string;
 };
 
+const ACTION_ORDER = [
+    'income', 'foreign_aid', 'coup',
+    'businesswoman', 'tax', 'investigate',
+    'accuse', 'assassinate', 'steal', 'exchange'
+];
+
 export const ActionPanel: React.FC<ActionPanelProps> = ({ className }) => {
     const { state, dispatch } = useGame();
     const prompt = state.pendingPrompt;
@@ -139,13 +145,6 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({ className }) => {
         setSelectedTarget(null);
         dispatch({ type: "CLEAR_TARGETING" });
     };
-
-    // Deterministic ordering for play actions
-    const ACTION_ORDER = [
-        'income', 'foreign_aid', 'coup',
-        'businesswoman', 'tax', 'investigate',
-        'accuse', 'assassinate', 'steal', 'exchange'
-    ];
 
     const displayActions = React.useMemo(() => {
         const allMainActions = Object.keys(ACTION_ICONS).filter(

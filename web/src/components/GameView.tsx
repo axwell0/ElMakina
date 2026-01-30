@@ -243,7 +243,7 @@ export const GameView: React.FC = () => {
                                     <HandTray
                                         hand={state.hand}
                                         isActive={state.activePlayerIndex === state.identity?.playerIndex}
-                                        onHoverStart={(_) => {
+                                        onHoverStart={() => {
                                             if (state.activePlayerIndex === state.identity?.playerIndex) {
                                                 // Optional: highlight relevant actions
                                             }
