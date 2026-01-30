@@ -4,6 +4,7 @@ import {cn} from '@/lib/utils';
 import {Clock, UserX, Wifi, WifiOff} from 'lucide-react';
 import {socket} from '@/network/socket';
 import { useGameSlice } from '@/state/hooks';
+import { PauseState } from '@/state/types';
 
 const formatSeconds = (seconds: number) => {
     const clamped = Math.max(0, seconds);
@@ -15,6 +16,12 @@ const formatSeconds = (seconds: number) => {
     return `${mins}m ${secs.toString().padStart(2, '0')}s`;
 };
 
+type PausedState = Extract<PauseState, { status: 'paused' }>;
+
+function isPausedState(pause: PauseState): pause is PausedState {
+    return pause.status === 'paused';
+}
+
 export const GamePausedOverlay: React.FC = () => {
     const { game } = useGameSlice();
     const pause = game.pause;
@@ -22,12 +29,12 @@ export const GamePausedOverlay: React.FC = () => {
     const [secondsLeft, setSecondsLeft] = React.useState<number>(0);
 
     React.useEffect(() => {
-        if (pause.status !== 'paused') {
+        if (!isPausedState(pause)) {
             return;
         }
         const update = () => {
             const now = Date.now();
-            const remainingMs = Math.max(0, (pause as any).deadlineMs - now);
+            const remainingMs = Math.max(0, pause.deadlineMs - now);
             setSecondsLeft(Math.ceil(remainingMs / 1000));
         };
         update();
@@ -35,20 +42,20 @@ export const GamePausedOverlay: React.FC = () => {
         return () => window.clearInterval(interval);
     }, [pause]);
 
-    if (pause.status !== 'paused') {
+    if (!isPausedState(pause)) {
         return null;
     }
 
     const identity = game.identity;
     const isEligible = typeof identity?.playerIndex === 'number'
-        ? (pause as any).eligibleVoters.includes(identity.playerIndex)
+        ? pause.eligibleVoters.includes(identity.playerIndex)
         : false;
     const hasVoted = typeof identity?.playerIndex === 'number'
-        ? (pause as any).kickVotes.includes(identity.playerIndex)
+        ? pause.kickVotes.includes(identity.playerIndex)
         : false;
-    const isPausedPlayer = identity?.playerIndex === (pause as any).pausedByIndex;
-    const votesTotal = (pause as any).eligibleVoters.length;
-    const votesCast = (pause as any).kickVotes.length;
+    const isPausedPlayer = identity?.playerIndex === pause.pausedByIndex;
+    const votesTotal = pause.eligibleVoters.length;
+    const votesCast = pause.kickVotes.length;
     const isConnected = game.isConnected;
 
     const handleKickVote = () => {

@@ -1,6 +1,6 @@
 import React, {useEffect, useReducer} from 'react';
 import {GameContext} from '@/store/gameContext';
-import {gameReducer} from '@/store/gameReducer';
+import {rootReducer, toGameState} from '@/state/slices';
 import {getMockState, type MockScenario} from './mockState';
 import {socket} from '@/network/socket';
 
@@ -8,7 +8,10 @@ export const MockGameProvider: React.FC<{ children: React.ReactNode; scenario?: 
     children,
     scenario = 'game',
 }) => {
-    const [state, dispatch] = useReducer(gameReducer, getMockState(scenario));
+    const [slicedState, dispatch] = useReducer(rootReducer, getMockState(scenario));
+
+    // Convert sliced state to flat GameState for backwards compatibility
+    const state = toGameState(slicedState);
 
     useEffect(() => {
         socket.setMockMode(true);

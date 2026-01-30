@@ -2,6 +2,7 @@
 // Runs before each test file
 
 import '@testing-library/jest-dom';
+import { vi, afterEach } from 'vitest';
 
 // Mock WebSocket for tests
 global.WebSocket = class MockWebSocket {
@@ -11,15 +12,25 @@ global.WebSocket = class MockWebSocket {
   static CLOSED = 3;
 
   readyState = MockWebSocket.OPEN;
-  onopen: ((this: WebSocket, ev: Event) => any) | null = null;
-  onmessage: ((this: WebSocket, ev: MessageEvent) => any) | null = null;
-  onclose: ((this: WebSocket, ev: CloseEvent) => any) | null = null;
-  onerror: ((this: WebSocket, ev: Event) => any) | null = null;
+  onopen: ((this: WebSocket, ev: Event) => unknown) | null = null;
+  onmessage: ((this: WebSocket, ev: MessageEvent<unknown>) => unknown) | null = null;
+  onclose: ((this: WebSocket, ev: CloseEvent) => unknown) | null = null;
+  onerror: ((this: WebSocket, ev: Event) => unknown) | null = null;
 
-  constructor(public url: string | URL, _protocols?: string | string[]) {}
+  constructor(
+    public url: string | URL,
+    protocols?: string | string[]
+  ) {
+    void protocols;
+  }
 
-  send(_data: string | ArrayBufferLike | Blob | ArrayBufferView): void {}
-  close(_code?: number, _reason?: string): void {}
+  send(data: string | ArrayBufferLike | Blob | ArrayBufferView): void {
+    void data;
+  }
+  close(code?: number, reason?: string): void {
+    void code;
+    void reason;
+  }
 } as unknown as typeof WebSocket;
 
 // Mock localStorage for tests
