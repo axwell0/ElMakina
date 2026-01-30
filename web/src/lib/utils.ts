@@ -1,6 +1,3 @@
-import {type ClassValue, clsx} from "clsx"
-import {twMerge} from "tailwind-merge"
-
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
-}
+// Re-export for backwards compatibility during migration
+// TODO: Update all imports to use @/ui/utils/cn and remove this file
+export {cn} from "@/ui/utils/cn"
