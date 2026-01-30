@@ -132,4 +132,19 @@
       stroke-dashoffset: 301.6;
     }
   }
+
+  @keyframes elimination-pulse {
+    0%, 100% { 
+      transform: scale(1);
+      filter: grayscale(0%);
+    }
+    50% { 
+      transform: scale(1.1);
+      filter: grayscale(50%);
+    }
+  }
+
+  .animate-elimination-pulse {
+    animation: elimination-pulse 0.5s ease-in-out 3;
+  }
 }
