@@ -13,3 +13,12 @@
 **/build
 **/.next
 **/tmp
+
+# Web-specific patterns (Docker context is root, web is subdirectory)
+web/node_modules
+web/.next
+web/dist
+web/coverage
+web/*.log
+web/.env
+web/.env.*

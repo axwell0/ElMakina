@@ -1,0 +1,93 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-elmakina}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-elmakina}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - elmakina
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  backend:
+    build:
+      context: .
+      dockerfile: deploy/docker/backend.Dockerfile
+      target: prod
+    environment:
+      ELMAKINA_HTTP_ADDR: :8080
+      ELMAKINA_WS_PATH: /ws
+      ELMAKINA_POSTGRES_DSN: postgres://${POSTGRES_USER:-elmakina}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-elmakina}?sslmode=disable
+      ELMAKINA_REPLAY_AUTOMIGRATE: "true"
+      ELMAKINA_CORS_ORIGINS: ${ELMAKINA_CORS_ORIGINS:-https://yourdomain.com}
+    networks:
+      - elmakina
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  web:
+    build:
+      context: .
+      dockerfile: deploy/docker/web.Dockerfile
+      target: prod
+    environment:
+      ELMAKINA_WS_URL: ${ELMAKINA_WS_URL:-wss://yourdomain.com/ws}
+      NODE_ENV: production
+    networks:
+      - elmakina
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+
+volumes:
+  postgres_data:
+
+networks:
+  elmakina:
+    driver: bridge

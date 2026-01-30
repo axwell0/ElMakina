@@ -21,8 +21,17 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const wsUrl = process.env.ELMAKINA_WS_URL || process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8080/ws';
+
   return (
     <html lang="en">
+      <head>
+        <script dangerouslySetInnerHTML={{__html: `
+          window.ELMAKINA_CONFIG = {
+            WS_URL: ${JSON.stringify(wsUrl)}
+          };
+        `}} />
+      </head>
       <body className={`${bodyFont.variable} ${displayFont.variable} antialiased`}>
         <ThemeSync />
         {children}
