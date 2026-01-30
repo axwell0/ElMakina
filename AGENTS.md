@@ -45,6 +45,32 @@ Fixes #123
 
 ## Coding Philosophy
 
+### Surgical Minimal Fixes
+
+**Principle:** Make the smallest possible change that solves the problem completely. Small changes are easier to review, test, and reason about. They also minimize the risk of introducing new bugs.
+
+**When fixing issues:**
+- **One concern per change** - Don't bundle unrelated fixes, even if they're small
+- **Preserve existing patterns** - Match the surrounding code style and conventions
+- **Avoid scope creep** - If you discover additional issues, note them for later rather than fixing everything at once
+- **Delete, don't comment out** - Remove dead code entirely rather than leaving it disabled
+- **Prefer configuration over code changes** - Use environment variables for deployment-specific behavior
+
+**Example:**
+```go
+// BAD: Over-engineered fix
+func WithCORS(origins []string, allowAll bool, customHeaders map[string]string) http.Handler {
+    // 50 lines of complex logic
+}
+
+// GOOD: Surgical minimal fix
+func WithCORS(origins []string) http.Handler {
+    // 10 lines, handles wildcard * and specific origins
+}
+```
+
+This approach ensures long-term maintainability and makes code review straightforward.
+
 ### Balanced Defensiveness
 
 **DO:**
