@@ -340,6 +340,135 @@ export function rootReducer(
           };
         }
 
+        case "challenge_window": {
+          const payload = envelope.payload as {
+            action_id: string;
+            actor_index: number;
+            claimed_role: string;
+            eligible: boolean;
+            kind: string;
+            prompt?: string;
+            target_index?: number;
+            timeout_ms?: number;
+          };
+          return {
+            ...state,
+            game: gameReducer(
+              state.game,
+              gameActions.challengeWindow(payload, envelope.request_id!)
+            ),
+            ui: uiReducer(state.ui, uiActions.updateTimestamp()),
+          };
+        }
+
+        case "counter_window": {
+          const payload = envelope.payload as {
+            action_id: string;
+            actor_index: number;
+            allowed_actions?: string[];
+            eligible: boolean;
+            prompt?: string;
+            target_index?: number;
+            timeout_ms?: number;
+          };
+          return {
+            ...state,
+            game: gameReducer(
+              state.game,
+              gameActions.counterWindow(payload, envelope.request_id!)
+            ),
+            ui: uiReducer(state.ui, uiActions.updateTimestamp()),
+          };
+        }
+
+        case "request_step": {
+          const payload = envelope.payload as {
+            prompt?: string;
+            step: {
+              context: string;
+              count: number;
+              options: string[];
+            };
+          };
+          return {
+            ...state,
+            game: gameReducer(
+              state.game,
+              gameActions.requestStep(payload, envelope.request_id!)
+            ),
+            ui: uiReducer(state.ui, uiActions.updateTimestamp()),
+          };
+        }
+
+        case "hand_state": {
+          const payload = envelope.payload as {
+            hand: string[];
+            player_index: number;
+          };
+          return {
+            ...state,
+            game: gameReducer(
+              state.game,
+              gameActions.handState(payload, state.game.identity)
+            ),
+            ui: uiReducer(state.ui, uiActions.updateTimestamp()),
+          };
+        }
+
+        case "prompt_closed": {
+          const payload = envelope.payload as { reason: string };
+          return {
+            ...state,
+            game: gameReducer(
+              state.game,
+              gameActions.promptClosed(payload, envelope.request_id!, state.game.pendingPrompt)
+            ),
+            ui: uiReducer(state.ui, uiActions.updateTimestamp()),
+          };
+        }
+
+        case "turn_timer": {
+          const payload = envelope.payload as {
+            active_player_index: number;
+            duration_ms: number;
+            state: string;
+            turn_number: number;
+          };
+          return {
+            ...state,
+            game: gameReducer(
+              state.game,
+              gameActions.turnTimer(payload)
+            ),
+          };
+        }
+
+        case "player_eliminated": {
+          const payload = envelope.payload as {
+            player_index: number;
+            reason: string;
+            turn: number;
+          };
+          const idx = payload.player_index;
+          const turn = payload.turn;
+          const playerName = state.game.players.find((p) => p.index === idx)?.name ?? "";
+          const toast = {
+            playerIndex: idx,
+            playerName,
+            reason: payload.reason,
+            turn,
+            id: `${idx}-${turn}-${Date.now()}`,
+          };
+          return {
+            ...state,
+            game: gameReducer(
+              state.game,
+              gameActions.playerEliminated(payload)
+            ),
+            ui: uiReducer(state.ui, uiActions.elimination(toast)),
+          };
+        }
+
         default:
           // Unknown message type - just update timestamp
           return {
