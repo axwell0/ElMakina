@@ -1,4 +1,4 @@
-import type {GameState} from '@/store/types';
+import type {GameState} from '@/state/types';
 
 const now = Date.now();
 

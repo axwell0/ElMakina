@@ -3,7 +3,7 @@ import {AnimatePresence, motion} from 'framer-motion';
 import {ArrowLeft, Flame} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import {cardImageForRole} from '@/lib/cards';
-import type {GameIdentity, HandCard, PlayerSnapshot} from '@/store/types';
+import type {GameIdentity, HandCard, PlayerSnapshot} from '@/state/types';
 import {PlayerRing} from '@/components/game/PlayerRing';
 import {HandTray} from '@/components/game/HandTray';
 import {HoverRoleCard, type RoleDetailsMap} from '@/components/game/HoverRoleCard';

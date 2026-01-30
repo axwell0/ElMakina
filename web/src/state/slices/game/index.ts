@@ -13,7 +13,7 @@ import type {
   Prompt,
   TargetingState,
   TurnTimerState,
-} from "@/store/types";
+} from "@/state/types";
 
 
 

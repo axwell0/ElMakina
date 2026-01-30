@@ -2,7 +2,7 @@ import React from 'react';
 import {motion} from 'framer-motion';
 import {cn} from '@/lib/utils';
 
-import type {GameIdentity, PlayerSnapshot, TurnTimerState} from '@/store/types';
+import type {GameIdentity, PlayerSnapshot, TurnTimerState} from '@/state/types';
 
 type SelfHudProps = {
     identity: GameIdentity;

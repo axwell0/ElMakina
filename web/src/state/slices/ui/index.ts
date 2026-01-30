@@ -11,7 +11,7 @@ import type {
   LogEntry,
   ReplayEntry,
   TurnTimerState,
-} from "@/store/types";
+} from "@/state/types";
 
 export interface UISliceState {
   // Preferences

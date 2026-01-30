@@ -5,7 +5,7 @@ import {socket} from '@/network/socket';
 import {Coins, Target} from 'lucide-react';
 import {getPlayerPositions} from '@/lib/layout';
 import type {RootAction} from '@/state/slices';
-import type {GameIdentity, PlayerSnapshot, Prompt, TargetingState, TurnTimerState} from '@/store/types';
+import type {GameIdentity, PlayerSnapshot, Prompt, TargetingState, TurnTimerState} from '@/state/types';
 
 
 type PlayerRingProps = {
