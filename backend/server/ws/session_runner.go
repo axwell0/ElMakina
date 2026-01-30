@@ -79,7 +79,7 @@ func newEventRecorder(session *server.GameSession, recorder replay.Recorder) *ev
 }
 
 func (r *eventRecorder) record(ctx context.Context, eventType string, visibility string, playerID *string, payload any) {
-	if r == nil || r.recorder == nil || r.matchID == "" {
+	if r.recorder == nil || r.matchID == "" {
 		return
 	}
 	seq := r.seq.Add(1)
@@ -98,14 +98,11 @@ func (r *eventRecorder) record(ctx context.Context, eventType string, visibility
 }
 
 func (r *eventRecorder) currentSeq() int64 {
-	if r == nil {
-		return 0
-	}
 	return r.seq.Load()
 }
 
 func (r *eventRecorder) playerIDForIndex(index int) *string {
-	if r == nil || index < 0 || index >= len(r.playerIDs) {
+	if index < 0 || index >= len(r.playerIDs) {
 		return nil
 	}
 	id := r.playerIDs[index]
@@ -113,7 +110,7 @@ func (r *eventRecorder) playerIDForIndex(index int) *string {
 }
 
 func (r *eventRecorder) startMatch(ctx context.Context, session *server.GameSession) {
-	if r == nil || r.recorder == nil || session == nil {
+	if r.recorder == nil || session == nil {
 		return
 	}
 	players := make([]replay.PlayerInfo, 0, len(session.PlayerIDs))
@@ -155,7 +152,7 @@ func (r *eventRecorder) startMatch(ctx context.Context, session *server.GameSess
 }
 
 func (r *eventRecorder) snapshot(ctx context.Context, gs *state.GameState) {
-	if r == nil || r.recorder == nil || gs == nil {
+	if r.recorder == nil || gs == nil {
 		return
 	}
 	seq := r.currentSeq()
@@ -170,7 +167,7 @@ func (r *eventRecorder) snapshot(ctx context.Context, gs *state.GameState) {
 }
 
 func (r *eventRecorder) endMatch(ctx context.Context, winnerIndex int, winnerName string) {
-	if r == nil || r.recorder == nil {
+	if r.recorder == nil {
 		return
 	}
 	if err := r.recorder.EndMatch(ctx, replay.MatchEndInput{
@@ -301,9 +298,6 @@ func (r *sessionRunner) Stop() {
 }
 
 func (r *sessionRunner) EnqueueClientEnvelope(senderIndex int, env Envelope) {
-	if r == nil {
-		return
-	}
 	select {
 	case r.cmdCh <- sessionCommand{senderIndex: senderIndex, env: &env}:
 	default:
@@ -311,9 +305,6 @@ func (r *sessionRunner) EnqueueClientEnvelope(senderIndex int, env Envelope) {
 }
 
 func (r *sessionRunner) EnqueueOffline(playerID string) {
-	if r == nil {
-		return
-	}
 	select {
 	case r.cmdCh <- sessionCommand{fn: func() { r.markOffline(playerID) }}:
 	default:
@@ -321,9 +312,6 @@ func (r *sessionRunner) EnqueueOffline(playerID string) {
 }
 
 func (r *sessionRunner) EnqueueOnline(playerID string) {
-	if r == nil {
-		return
-	}
 	select {
 	case r.cmdCh <- sessionCommand{fn: func() { r.markOnline(playerID) }}:
 	default:
@@ -556,7 +544,7 @@ type chatIncomingPayload struct {
 }
 
 func (r *sessionRunner) handleChatMessage(senderIndex int, env Envelope) {
-	if r == nil || r.session == nil || r.session.Game == nil {
+	if r.session == nil || r.session.Game == nil {
 		return
 	}
 	if senderIndex < 0 || senderIndex >= len(r.session.Game.CurrentState.Players) {
@@ -946,7 +934,7 @@ func (r *sessionRunner) broadcastGameOver(winner *state.Player) {
 }
 
 func (r *sessionRunner) broadcastGameState() {
-	if r == nil || r.session == nil || r.session.Game == nil {
+	if r.session == nil || r.session.Game == nil {
 		return
 	}
 	r.provider.broadcast(Envelope{
@@ -956,7 +944,7 @@ func (r *sessionRunner) broadcastGameState() {
 }
 
 func (r *sessionRunner) broadcastHandState() {
-	if r == nil || r.session == nil || r.session.Game == nil {
+	if r.session == nil || r.session.Game == nil {
 		return
 	}
 	gs := &r.session.Game.CurrentState
@@ -972,7 +960,7 @@ func (r *sessionRunner) broadcastHandState() {
 }
 
 func (r *sessionRunner) broadcastEliminations(prevCounts []int, turn int, reasons map[int]string) {
-	if r == nil || r.session == nil || r.session.Game == nil {
+	if r.session == nil || r.session.Game == nil {
 		return
 	}
 	gs := &r.session.Game.CurrentState

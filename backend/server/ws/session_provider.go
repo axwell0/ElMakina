@@ -93,7 +93,7 @@ func (p *sessionProvider) Errors() <-chan error { return p.errCh }
 
 func (p *sessionProvider) setActionWindow(reqID string, actor int, allowed []models.ActionID) {
 	p.promptMu.Lock()
-	p.action = &actionWindow{requestID: reqID, actor: actor, allowed: append([]models.ActionID{}, allowed...)}
+	p.action = &actionWindow{requestID: reqID, actor: actor, allowed: allowed}
 	p.promptMu.Unlock()
 }
 
@@ -114,7 +114,7 @@ func (p *sessionProvider) setChallengeWindow(reqID string, window engine.Challen
 		claimedRole:        window.ClaimedRole,
 		kind:               window.Kind,
 		targetIndex:        targetIndexFromAction(window.Action),
-		allowedChallengers: append([]int{}, window.AllowedChallengers...),
+		allowedChallengers: window.AllowedChallengers,
 		timeoutMs:          timeout.Milliseconds(),
 	}
 	p.promptMu.Unlock()
@@ -134,8 +134,8 @@ func (p *sessionProvider) setCounterWindow(reqID string, window engine.CounterWi
 		requestID:      reqID,
 		actorIndex:     window.MainAction.SourceIndex,
 		actionID:       window.MainAction.ID,
-		allowedActions: append([]models.ActionID{}, window.AllowedActions...),
-		allowedPlayers: append([]int{}, window.AllowedPlayers...),
+		allowedActions: window.AllowedActions,
+		allowedPlayers: window.AllowedPlayers,
 		targetIndex:    targetIndexFromAction(window.MainAction),
 		timeoutMs:      timeout.Milliseconds(),
 	}
@@ -688,11 +688,15 @@ func (p *sessionProvider) send(player int, env Envelope) error {
 
 func (p *sessionProvider) broadcast(env Envelope) {
 	p.mu.RLock()
-	defer p.mu.RUnlock()
+	clients := make([]*clientConn, 0, len(p.players))
 	for _, client := range p.players {
-		if client == nil {
-			continue
+		if client != nil {
+			clients = append(clients, client)
 		}
+	}
+	p.mu.RUnlock()
+
+	for _, client := range clients {
 		client.sendMu.Lock()
 		_ = client.conn.WriteJSON(env)
 		client.sendMu.Unlock()
