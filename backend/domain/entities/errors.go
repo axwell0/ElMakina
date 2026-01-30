@@ -20,9 +20,13 @@ var (
 	ErrConcurrentModification  = errors.New("concurrent modification detected")
 
 	// Player operation errors
-	ErrPlayerNotFound = errors.New("player not found")
-	ErrInvalidToken   = errors.New("invalid token")
-	ErrPlayerInLobby  = errors.New("player is in a lobby")
+	ErrPlayerNotFound    = errors.New("player not found")
+	ErrInvalidToken      = errors.New("invalid token")
+	ErrPlayerInLobby     = errors.New("player is in a lobby")
+	ErrInvalidNickname   = errors.New("invalid nickname")
+	ErrNicknameTooLong   = errors.New("nickname too long")
+	ErrNicknameEmpty     = errors.New("nickname cannot be empty")
+	ErrPlayerNotInactive = errors.New("player is not inactive")
 )
 
 // IsNotFound returns true if the error is a "not found" error.

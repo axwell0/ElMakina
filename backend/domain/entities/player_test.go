@@ -123,8 +123,9 @@ func TestReconstitutePlayer(t *testing.T) {
 	avatar := "avatar-url"
 	createdAt := time.Now().UTC()
 	updatedAt := time.Now().UTC()
+	lastActiveAt := time.Now().UTC()
 
-	player := ReconstitutePlayer(id, nick, token, avatar, createdAt, updatedAt)
+	player := ReconstitutePlayer(id, nick, token, avatar, createdAt, updatedAt, lastActiveAt)
 
 	assert.Equal(t, id, player.ID())
 	assert.Equal(t, nick, player.Nick())
@@ -132,4 +133,21 @@ func TestReconstitutePlayer(t *testing.T) {
 	assert.Equal(t, avatar, player.Avatar())
 	assert.Equal(t, createdAt, player.CreatedAt())
 	assert.Equal(t, updatedAt, player.UpdatedAt())
+	assert.Equal(t, lastActiveAt, player.LastActiveAt())
+}
+
+func TestPlayer_TouchActivity(t *testing.T) {
+	player, err := NewPlayer("player-1", "Alice", "token-1")
+	require.NoError(t, err)
+
+	originalActivity := player.LastActiveAt()
+
+	// Wait a tiny bit to ensure time changes
+	time.Sleep(10 * time.Millisecond)
+
+	// Touch activity
+	player.TouchActivity()
+
+	assert.True(t, player.LastActiveAt().After(originalActivity))
+	assert.Equal(t, player.LastActiveAt(), player.UpdatedAt())
 }

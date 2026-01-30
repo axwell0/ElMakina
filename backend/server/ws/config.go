@@ -5,15 +5,17 @@ import (
 	"fmt"
 	"os"
 
+	"ElMakina/backend/domain/repositories"
+	"ElMakina/backend/domain/services"
+	persistence "ElMakina/backend/infrastructure/persistence/repositories"
+	"ElMakina/backend/infrastructure/persistence/transactions"
 	"ElMakina/backend/server"
 	"ElMakina/backend/server/replay"
-	"ElMakina/backend/server/store"
 	"gorm.io/gorm"
 )
 
 // NewLobbyManagerFromEnv builds a lobby manager using PostgreSQL persistence.
 // This function opens a PostgreSQL connection using the DSN from ELMAKINA_POSTGRES_DSN.
-// Deprecated: Use NewLobbyManagerWithDB instead for better control over the database connection.
 func NewLobbyManagerFromEnv(minPlayers, maxPlayers int) (*server.LobbyManager, *gorm.DB, error) {
 	dsn := os.Getenv("ELMAKINA_POSTGRES_DSN")
 	if dsn == "" {
@@ -36,12 +38,33 @@ func NewLobbyManagerFromEnv(minPlayers, maxPlayers int) (*server.LobbyManager, *
 // NewLobbyManagerWithDB builds a lobby manager using the provided PostgreSQL database.
 // This is the preferred method for production use.
 func NewLobbyManagerWithDB(minPlayers, maxPlayers int, db *gorm.DB) (*server.LobbyManager, error) {
-	lobbyStore := store.NewPostgresLobbyStore(db)
+	// Create repositories
+	playerRepo := persistence.NewPostgresPlayerRepository(db)
+	lobbyRepo := persistence.NewPostgresLobbyRepository(db)
+	unitOfWork := transactions.NewGormUnitOfWork(db)
 
-	ctx := context.Background()
-	if err := lobbyStore.AutoMigrate(ctx); err != nil {
-		return nil, fmt.Errorf("failed to migrate lobby tables: %w", err)
+	// Create player service
+	playerService := services.NewPlayerService(playerRepo, lobbyRepo, unitOfWork, nil, nil)
+
+	// Create lobby manager
+	manager := server.NewLobbyManager(minPlayers, maxPlayers, playerService, lobbyRepo, unitOfWork)
+
+	return manager, nil
+}
+
+// RepositoryProvider provides access to repository instances.
+// This is useful for dependency injection and testing.
+type RepositoryProvider struct {
+	PlayerRepo repositories.PlayerRepository
+	LobbyRepo  repositories.LobbyRepository
+	UnitOfWork repositories.UnitOfWork
+}
+
+// NewRepositoryProvider creates a new repository provider from a database connection.
+func NewRepositoryProvider(db *gorm.DB) *RepositoryProvider {
+	return &RepositoryProvider{
+		PlayerRepo: persistence.NewPostgresPlayerRepository(db),
+		LobbyRepo:  persistence.NewPostgresLobbyRepository(db),
+		UnitOfWork: transactions.NewGormUnitOfWork(db),
 	}
-
-	return server.NewLobbyManagerWithStore(minPlayers, maxPlayers, lobbyStore)
 }
