@@ -6,6 +6,7 @@
 
 import type {
   ActiveMatch,
+  CardDiscardEvent,
   GameIdentity,
   HandCard,
   PauseState,
@@ -30,6 +31,9 @@ export interface GameSliceState {
   turnTimer: TurnTimerState | null;
   pause: PauseState;
   gameOver: { winnerIndex: number; winnerName: string } | null;
+  discardQueue: CardDiscardEvent[];
+  currentDiscard: CardDiscardEvent | null;
+  eliminatingPlayer: number | null;
 }
 
 export const initialGameSliceState: GameSliceState = {
@@ -45,6 +49,9 @@ export const initialGameSliceState: GameSliceState = {
   turnTimer: null,
   pause: { status: "inactive" },
   gameOver: null,
+  discardQueue: [],
+  currentDiscard: null,
+  eliminatingPlayer: null,
 };
 
 // Payload types
@@ -191,6 +198,8 @@ export type GameAction =
   | { type: "GAME_RESUMED"; payload: GameResumedPayload }
   | { type: "KICK_VOTE_UPDATE"; payload: KickVoteUpdatePayload }
   | { type: "PLAYER_KICKED"; payload: PlayerKickedPayload }
+  | { type: "CARD_DISCARDED"; payload: CardDiscardEvent }
+  | { type: "DISMISS_DISCARD" }
   | { type: "RESET" };
 
 export function gameReducer(
@@ -507,6 +516,26 @@ export function gameReducer(
       };
     }
 
+    case "CARD_DISCARDED": {
+      const payload = action.payload;
+      return {
+        ...state,
+        discardQueue: [...state.discardQueue, payload],
+        currentDiscard: state.currentDiscard ?? payload,
+        eliminatingPlayer: payload.isElimination ? payload.playerIndex : state.eliminatingPlayer,
+      };
+    }
+
+    case "DISMISS_DISCARD": {
+      const nextQueue = state.discardQueue.slice(1);
+      return {
+        ...state,
+        discardQueue: nextQueue,
+        currentDiscard: nextQueue.length > 0 ? nextQueue[0] : null,
+        eliminatingPlayer: state.currentDiscard?.isElimination ? null : state.eliminatingPlayer,
+      };
+    }
+
     case "RESET":
       return initialGameSliceState;
 
@@ -608,6 +637,11 @@ export const gameActions = {
     winnerIndex,
     winnerName,
   }),
+  cardDiscarded: (payload: CardDiscardEvent): GameAction => ({
+    type: "CARD_DISCARDED",
+    payload,
+  }),
+  dismissDiscard: (): GameAction => ({ type: "DISMISS_DISCARD" }),
   playerEliminated: (payload: PlayerEliminatedPayload): GameAction => ({
     type: "PLAYER_ELIMINATED",
     payload,

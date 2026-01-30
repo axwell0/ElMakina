@@ -305,6 +305,29 @@ export function rootReducer(
           };
         }
 
+        case "card_discarded": {
+          const payload = envelope.payload as {
+            player_index: number;
+            player_name: string;
+            card_role: string;
+            reason: string;
+            turn: number;
+            is_elimination: boolean;
+          };
+          return {
+            ...state,
+            game: gameReducer(state.game, gameActions.cardDiscarded({
+              playerIndex: payload.player_index,
+              playerName: payload.player_name,
+              cardRole: payload.card_role,
+              reason: payload.reason,
+              turn: payload.turn,
+              isElimination: payload.is_elimination,
+              timestamp: Date.now(),
+            })),
+          };
+        }
+
         case "game_over": {
           const payload = envelope.payload as {
             winner_index: number;
