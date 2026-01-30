@@ -52,8 +52,8 @@ export type UIAction =
   | { type: "SET_SFX_MUTED"; muted: boolean }
   | { type: "SET_THEME"; theme: "light" | "dark" }
   | { type: "GAME_LOG"; entry: LogEntry }
-  | { type: "CHAT_MESSAGE"; message: ChatMessage }
-  | { type: "INVESTIGATE_RESULT"; result: InvestigateResult }
+  | { type: "CHAT_MESSAGE"; payload: { id: string; senderIndex: number; senderName: string; text: string; timestamp: number } }
+  | { type: "INVESTIGATE_RESULT"; payload: { targetName: string; role: string } }
   | { type: "CLEAR_INVESTIGATE" }
   | { type: "ELIMINATION"; toast: EliminationToast }
   | { type: "CLEAR_ELIMINATION_TOAST" }
@@ -83,12 +83,12 @@ export function uiReducer(
     case "CHAT_MESSAGE":
       return {
         ...state,
-        chat: [...state.chat, action.message].slice(-50), // Keep last 50 messages
+        chat: [...state.chat, action.payload].slice(-100), // Keep last 100 messages
         lastUpdateTs: Date.now(),
       };
 
     case "INVESTIGATE_RESULT":
-      return { ...state, investigateResult: action.result };
+      return { ...state, investigateResult: action.payload };
 
     case "CLEAR_INVESTIGATE":
       return { ...state, investigateResult: null };
@@ -146,13 +146,13 @@ export const uiActions = {
     type: "GAME_LOG",
     entry,
   }),
-  chatMessage: (message: ChatMessage): UIAction => ({
+  chatMessage: (message: { id: string; senderIndex: number; senderName: string; text: string; timestamp: number }): UIAction => ({
     type: "CHAT_MESSAGE",
-    message,
+    payload: message,
   }),
-  investigateResult: (result: InvestigateResult): UIAction => ({
+  investigateResult: (result: { targetName: string; role: string }): UIAction => ({
     type: "INVESTIGATE_RESULT",
-    result,
+    payload: result,
   }),
   clearInvestigate: (): UIAction => ({ type: "CLEAR_INVESTIGATE" }),
   elimination: (toast: EliminationToast): UIAction => ({

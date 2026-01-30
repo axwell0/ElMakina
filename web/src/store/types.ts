@@ -116,15 +116,22 @@ export interface TurnTimerState {
 export type PauseState =
     | { status: "inactive" }
     | {
-        status: "active";
-        pausedByPlayerId: string | null;
+        status: "paused";
+        pausedByPlayerId: string;
         pausedByIndex: number;
         pausedByName: string;
         deadlineMs: number;
         durationMs: number;
-        pauseReason: "disconnect";
+        pauseReason: string;
         eligibleVoters: number[];
         kickVotes: number[];
+    }
+    | {
+        status: "resumed";
+        resumedByPlayerId: string;
+        resumedByIndex: number;
+        resumedByName: string;
+        resumeReason: string;
     };
 
 export interface TargetingState {
