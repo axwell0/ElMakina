@@ -10,6 +10,7 @@ require (
 	github.com/stretchr/testify v1.9.0
 	gorm.io/datatypes v1.2.6
 	gorm.io/driver/postgres v1.6.0
+	gorm.io/driver/sqlite v1.6.0
 	gorm.io/gorm v1.30.0
 )
 
@@ -28,6 +29,7 @@ require (
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
+	github.com/mattn/go-sqlite3 v1.14.33 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
