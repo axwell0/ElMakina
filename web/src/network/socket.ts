@@ -76,8 +76,10 @@ export class SocketManager {
     private maxConnectionLog: number = 50;
     private validateEnvelope = buildValidator();
 
-    constructor(url: string = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8080/ws") {
-        this.url = url;
+    constructor(url?: string) {
+        // Runtime config takes precedence, then build-time env, then default
+        const runtimeUrl = typeof window !== 'undefined' && (window as Window & { ELMAKINA_CONFIG?: { WS_URL: string } }).ELMAKINA_CONFIG?.WS_URL;
+        this.url = url || runtimeUrl || process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8080/ws";
         if (typeof window !== "undefined") {
             this.reconnectToken = localStorage.getItem(STORAGE_KEYS.reconnectToken);
             this.nickname = localStorage.getItem(STORAGE_KEYS.nickname);
