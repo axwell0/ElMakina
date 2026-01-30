@@ -105,6 +105,16 @@ export interface EliminationToast {
     id: string;
 }
 
+export interface CardDiscardEvent {
+    playerIndex: number;
+    playerName: string;
+    cardRole: string;
+    reason: string;
+    turn: number;
+    isElimination: boolean;
+    timestamp: number;
+}
+
 export interface TurnTimerState {
     activePlayerIndex: number;
     durationMs: number;
@@ -178,6 +188,9 @@ export interface GameState {
     connectionLostAt: number | null;
     lastUpdateTs: number;
     mockScenario?: string;
+    discardQueue: CardDiscardEvent[];
+    currentDiscard: CardDiscardEvent | null;
+    eliminatingPlayer: number | null;
 }
 
 export const initialGameState: GameState = {
@@ -209,4 +222,7 @@ export const initialGameState: GameState = {
     connectionLostAt: null,
     lastUpdateTs: 0,
     mockScenario: undefined,
+    discardQueue: [],
+    currentDiscard: null,
+    eliminatingPlayer: null,
 };
