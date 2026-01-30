@@ -300,10 +300,6 @@ func (s *Server) handleLobbyMessage(client *clientConn, env Envelope) error {
 }
 
 func (s *Server) attachSession(session *server.GameSession, runner *sessionRunner) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.sessions[session.LobbyID] = runner
-
 	playerNames := make([]string, 0, len(session.PlayerIDs))
 	playerAvatars := make([]string, 0, len(session.PlayerIDs))
 	for _, id := range session.PlayerIDs {
@@ -317,6 +313,14 @@ func (s *Server) attachSession(session *server.GameSession, runner *sessionRunne
 		playerAvatars = append(playerAvatars, player.Avatar)
 	}
 
+	type clientInfo struct {
+		client *clientConn
+		index  int
+	}
+	clientsToNotify := make([]clientInfo, 0, len(session.PlayerIDs))
+
+	s.mu.Lock()
+	s.sessions[session.LobbyID] = runner
 	for _, id := range session.PlayerIDs {
 		client := s.clients[id]
 		if client == nil {
@@ -326,23 +330,28 @@ func (s *Server) attachSession(session *server.GameSession, runner *sessionRunne
 		client.session = runner
 		client.playerIndex = index
 		runner.provider.attach(index, client)
-		_ = s.send(client, Envelope{
+		clientsToNotify = append(clientsToNotify, clientInfo{client: client, index: index})
+	}
+	s.mu.Unlock()
+
+	for _, info := range clientsToNotify {
+		_ = s.send(info.client, Envelope{
 			Type: MsgLobbyStarted,
 			Payload: mustJSON(LobbyStartedPayload{
 				LobbyID:       session.LobbyID,
 				MatchID:       session.MatchID,
-				PlayerIndex:   index,
+				PlayerIndex:   info.index,
 				PlayerCount:   len(session.PlayerIDs),
 				PlayerNames:   playerNames,
 				PlayerAvatars: playerAvatars,
 				IndexMapping:  session.IndexByPlayer,
 			}),
 		})
-		_ = s.send(client, Envelope{
+		_ = s.send(info.client, Envelope{
 			Type: MsgHandState,
 			Payload: mustJSON(HandStatePayload{
-				PlayerIndex: index,
-				Hand:        buildHandRoles(session.Game.CurrentState.Players[index].Hand),
+				PlayerIndex: info.index,
+				Hand:        buildHandRoles(session.Game.CurrentState.Players[info.index].Hand),
 			}),
 		})
 	}
@@ -370,11 +379,25 @@ func (s *Server) reattachToLobby(client *clientConn) {
 	client.lobbyID = lobbyID
 	session := s.sessions[lobbyID]
 	if session == nil {
-		_ = s.manager.ResetLobbyToOpen(lobbyID)
+		if err := s.manager.ResetLobbyToOpen(lobbyID); err != nil {
+			log.Printf("failed to reset lobby %s: %v", lobbyID, err)
+		}
 		s.broadcastLobbyState(lobbyID)
 		return
 	}
-	index := session.session.IndexByPlayer[client.player.ID]
+	if session.session == nil {
+		log.Printf("session has no game state for lobby %s", lobbyID)
+		if err := s.manager.ResetLobbyToOpen(lobbyID); err != nil {
+			log.Printf("failed to reset lobby %s: %v", lobbyID, err)
+		}
+		s.broadcastLobbyState(lobbyID)
+		return
+	}
+	index, ok := session.session.IndexByPlayer[client.player.ID]
+	if !ok {
+		log.Printf("player %s not found in session for lobby %s", client.player.ID, lobbyID)
+		return
+	}
 	client.session = session
 	client.playerIndex = index
 	session.provider.attach(index, client)
@@ -412,6 +435,7 @@ func (s *Server) reattachToLobby(client *clientConn) {
 func (s *Server) broadcastLobbyState(lobbyID string) {
 	lobby, err := s.manager.GetLobby(lobbyID)
 	if err != nil {
+		log.Printf("broadcastLobbyState: failed to get lobby %s: %v", lobbyID, err)
 		return
 	}
 	playerNicks := make([]string, 0, len(lobby.PlayerIDs))
@@ -420,13 +444,17 @@ func (s *Server) broadcastLobbyState(lobbyID string) {
 	for _, id := range lobby.PlayerIDs {
 		player, err := s.manager.GetPlayer(id)
 		if err != nil {
+			log.Printf("broadcastLobbyState: failed to get player %s: %v", id, err)
 			continue
 		}
 		playerNicks = append(playerNicks, player.Nick)
 		playerIDs = append(playerIDs, player.ID)
 		playerAvatars = append(playerAvatars, player.Avatar)
 	}
-	leader, _ := s.manager.GetPlayer(lobby.LeaderID)
+	leader, err := s.manager.GetPlayer(lobby.LeaderID)
+	if err != nil {
+		log.Printf("broadcastLobbyState: failed to get leader %s: %v", lobby.LeaderID, err)
+	}
 	leaderNick := ""
 	if leader != nil {
 		leaderNick = leader.Nick
@@ -455,13 +483,17 @@ func (s *Server) broadcastLobbyState(lobbyID string) {
 }
 
 func (s *Server) broadcastLobbyList() {
-	online := make(map[string]struct{}, len(s.clients))
 	s.mu.Lock()
+	online := make(map[string]struct{}, len(s.clients))
 	for id := range s.clients {
 		online[id] = struct{}{}
 	}
 	s.mu.Unlock()
-	_, _ = s.manager.PruneEmptyOpenLobbies(online)
+
+	if _, err := s.manager.PruneEmptyOpenLobbies(online); err != nil {
+		log.Printf("broadcastLobbyList: failed to prune lobbies: %v", err)
+	}
+
 	lobbies := s.manager.ListLobbies()
 	items := make([]LobbySummaryPayload, 0, len(lobbies))
 	for _, lobby := range lobbies {
@@ -469,6 +501,7 @@ func (s *Server) broadcastLobbyList() {
 		for _, id := range lobby.PlayerIDs {
 			player, err := s.manager.GetPlayer(id)
 			if err != nil {
+				log.Printf("broadcastLobbyList: failed to get player %s: %v", id, err)
 				avatars = append(avatars, "")
 				continue
 			}
@@ -487,9 +520,15 @@ func (s *Server) broadcastLobbyList() {
 	}
 	payload := mustJSON(LobbyListPayload{Lobbies: items})
 
+	// Collect clients while locked, then send after releasing lock to avoid blocking
+	clientsToNotify := make([]*clientConn, 0, len(s.clients))
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	for _, client := range s.clients {
+		clientsToNotify = append(clientsToNotify, client)
+	}
+	s.mu.Unlock()
+
+	for _, client := range clientsToNotify {
 		_ = s.send(client, Envelope{Type: MsgLobbyListRes, Payload: payload})
 	}
 }
