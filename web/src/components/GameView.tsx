@@ -3,6 +3,7 @@ import {useGame} from '../store/gameContext';
 import {ActionPanel} from './ActionPanel';
 import {InteractionModal} from './InteractionModal';
 import {RevealModal} from './RevealModal';
+import {CardDiscardedModal} from './CardDiscardedModal';
 import {CoinManager} from './CoinManager';
 import {GameOverModal} from './GameOverModal';
 import {PhaseOverlay} from './PhaseOverlay';
@@ -491,6 +492,7 @@ export const GameView: React.FC = () => {
             )}
             <InteractionModal />
             <RevealModal />
+            <CardDiscardedModal />
             <CoinManager />
             <GameOverModal />
         </div>
