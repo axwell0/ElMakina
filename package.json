@@ -8,9 +8,7 @@
     "start": "next start ./web",
     "lint": "bunx eslint web",
     "generate:ws-contract": "node web/scripts/generate-ws-contract.mjs",
-    "check:ws-contract": "bun run generate:ws-contract && git diff --exit-code web/src/network/ws-contract.ts src/network/ws-schema.json",
-    "generate:types": "cd backend && go run scripts/generate-types/main.go",
-    "check:types": "npm run generate:types && git diff --exit-code web/src/types/generated.ts"
+    "check:ws-contract": "bun run generate:ws-contract && git diff --exit-code web/src/network/ws-contract.ts web/src/network/ws-schema.json"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

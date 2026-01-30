@@ -6,7 +6,6 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/invopop/jsonschema v0.13.0
 	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1
-	github.com/skia-dev/go2ts v1.5.0
 	github.com/stretchr/testify v1.9.0
 	gorm.io/datatypes v1.2.6
 	gorm.io/driver/postgres v1.6.0
