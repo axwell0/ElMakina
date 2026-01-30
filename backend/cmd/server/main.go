@@ -35,10 +35,15 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.Handle(cfg.WSPath, srv)
+	mux.HandleFunc("/ready", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"status":"ready"}`))
+	})
 	if recorder != nil {
 		mux.Handle("/replay/", replay.NewHandler(recorder))
 	}
-	handler := withCORS(mux)
+	handler := withCORS(cfg.CORSOrigins, mux)
 
 	httpServer := &http.Server{
 		Addr:              cfg.HTTPAddr,
@@ -63,20 +68,38 @@ func main() {
 	}
 }
 
-func withCORS(next http.Handler) http.Handler {
-	allowedOrigins := map[string]struct{}{
-		"http://localhost:3000": {},
-		"http://127.0.0.1:3000": {},
+func withCORS(origins []string, next http.Handler) http.Handler {
+	// Check if wildcard is enabled
+	allowAll := false
+	for _, o := range origins {
+		if o == "*" {
+			allowAll = true
+			break
+		}
 	}
+
+	// Build lookup map for specific origins
+	allowedOrigins := make(map[string]struct{})
+	for _, o := range origins {
+		if o != "*" {
+			allowedOrigins[o] = struct{}{}
+		}
+	}
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
-		if _, ok := allowedOrigins[origin]; ok {
+
+		if allowAll {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+		} else if _, ok := allowedOrigins[origin]; ok {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Vary", "Origin")
-			w.Header().Set("Access-Control-Allow-Credentials", "true")
-			w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		}
+
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
 			return
