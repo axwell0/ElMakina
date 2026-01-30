@@ -359,14 +359,12 @@ func (s *Server) attachSession(session *server.GameSession, runner *sessionRunne
 
 func (s *Server) send(client *clientConn, env Envelope) error {
 	client.sendMu.Lock()
-	defer client.sendMu.Unlock()
-	return client.conn.WriteJSON(env)
+	err := client.conn.WriteJSON(env)
+	client.sendMu.Unlock()
+	return err
 }
 
 func (s *Server) sendRaw(conn wsConn, env Envelope) error {
-	if conn == nil {
-		return fmt.Errorf("nil connection")
-	}
 	return conn.WriteJSON(env)
 }
 
@@ -471,13 +469,18 @@ func (s *Server) broadcastLobbyState(lobbyID string) {
 		Status:        string(lobby.Status),
 	})
 
+	// Collect clients while locked
+	clientsToNotify := make([]*clientConn, 0, len(lobby.PlayerIDs))
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	for _, id := range lobby.PlayerIDs {
-		client := s.clients[id]
-		if client == nil {
-			continue
+		if client := s.clients[id]; client != nil {
+			clientsToNotify = append(clientsToNotify, client)
 		}
+	}
+	s.mu.Unlock()
+
+	// Send after releasing lock
+	for _, client := range clientsToNotify {
 		_ = s.send(client, Envelope{Type: MsgLobbyState, Payload: payload})
 	}
 }

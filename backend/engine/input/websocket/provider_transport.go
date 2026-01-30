@@ -48,8 +48,9 @@ func (p *Provider) sendTo(player int, env Envelope) error {
 		return fmt.Errorf("player %d not connected", player)
 	}
 	state.sendMu.Lock()
-	defer state.sendMu.Unlock()
-	return state.conn.WriteJSON(env)
+	err := state.conn.WriteJSON(env)
+	state.sendMu.Unlock()
+	return err
 }
 
 func (p *Provider) dispatch(sender int, env Envelope) {
