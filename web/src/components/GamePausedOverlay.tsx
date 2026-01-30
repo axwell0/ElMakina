@@ -1,9 +1,9 @@
 import React from 'react';
-import {useGame} from '@/store/gameContext';
 import {Button} from '@/components/ui/button';
 import {cn} from '@/lib/utils';
 import {Clock, UserX, Wifi, WifiOff} from 'lucide-react';
 import {socket} from '@/network/socket';
+import { useGameSlice } from '@/state/hooks';
 
 const formatSeconds = (seconds: number) => {
     const clamped = Math.max(0, seconds);
@@ -16,18 +16,18 @@ const formatSeconds = (seconds: number) => {
 };
 
 export const GamePausedOverlay: React.FC = () => {
-    const { state } = useGame();
-    const pause = state.pause;
+    const { game } = useGameSlice();
+    const pause = game.pause;
 
     const [secondsLeft, setSecondsLeft] = React.useState<number>(0);
 
     React.useEffect(() => {
-        if (pause.status !== 'active') {
+        if (pause.status !== 'paused') {
             return;
         }
         const update = () => {
             const now = Date.now();
-            const remainingMs = Math.max(0, pause.deadlineMs - now);
+            const remainingMs = Math.max(0, (pause as any).deadlineMs - now);
             setSecondsLeft(Math.ceil(remainingMs / 1000));
         };
         update();
@@ -35,21 +35,21 @@ export const GamePausedOverlay: React.FC = () => {
         return () => window.clearInterval(interval);
     }, [pause]);
 
-    if (pause.status !== 'active') {
+    if (pause.status !== 'paused') {
         return null;
     }
 
-    const identity = state.identity;
+    const identity = game.identity;
     const isEligible = typeof identity?.playerIndex === 'number'
-        ? pause.eligibleVoters.includes(identity.playerIndex)
+        ? (pause as any).eligibleVoters.includes(identity.playerIndex)
         : false;
     const hasVoted = typeof identity?.playerIndex === 'number'
-        ? pause.kickVotes.includes(identity.playerIndex)
+        ? (pause as any).kickVotes.includes(identity.playerIndex)
         : false;
-    const isPausedPlayer = identity?.playerIndex === pause.pausedByIndex;
-    const votesTotal = pause.eligibleVoters.length;
-    const votesCast = pause.kickVotes.length;
-    const isConnected = state.isConnected;
+    const isPausedPlayer = identity?.playerIndex === (pause as any).pausedByIndex;
+    const votesTotal = (pause as any).eligibleVoters.length;
+    const votesCast = (pause as any).kickVotes.length;
+    const isConnected = game.isConnected;
 
     const handleKickVote = () => {
         if (!isEligible || hasVoted) {
