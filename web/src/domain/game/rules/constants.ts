@@ -31,11 +31,6 @@ export const INCOME_AMOUNT = 1;
 export const FOREIGN_AID_AMOUNT = 2;
 
 /**
- * Coins gained from tax (TaxCollector)
- */
-export const TAX_AMOUNT = 3;
-
-/**
  * Coins gained from businesswoman action
  */
 export const BUSINESSWOMAN_AMOUNT = 4;
@@ -51,16 +46,21 @@ export const STEAL_AMOUNT = 2;
 export const MAX_COINS = 12;
 
 /**
- * Maximum cards in hand
- */
-export const MAX_HAND_SIZE = 2;
-
-/**
  * Maximum number of players
  */
-export const MAX_PLAYERS = 6;
+export const MAX_PLAYERS = 9;
 
 /**
  * Minimum number of players
  */
 export const MIN_PLAYERS = 2;
+
+/**
+ * Get the starting hand size based on player count
+ * Returns 3 cards for 2-4 players, 2 cards for 5+ players
+ * @param playerCount - The number of players in the game
+ * @returns The starting hand size (2 or 3 cards)
+ */
+export function getStartingHandSize(playerCount: number): number {
+  return playerCount <= 4 ? 3 : 2;
+}
