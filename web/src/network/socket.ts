@@ -2,6 +2,11 @@ import type {ErrorObject} from 'ajv';
 import Ajv2020 from 'ajv/dist/2020';
 import wsSchema from '@/network/ws-schema.json';
 import type {ElMakinaWebSocketEnvelope} from '@/network/ws-contract';
+import {
+    validateEnvelopeStructure,
+    isValidInboundMessageType,
+    validationLogger,
+} from '@/validation';
 
 export type RequestId = string;
 export type WsEnvelope = ElMakinaWebSocketEnvelope;
@@ -120,19 +125,57 @@ export class SocketManager {
         };
 
         this.ws.onmessage = (event) => {
+            const startTime = performance.now();
+
             try {
-                const envelope = JSON.parse(event.data) as WsEnvelope;
-                if (this.validateEnvelope && !this.validateEnvelope(envelope)) {
-                    const errors = this.validateEnvelope.errors as ErrorObject[] | null | undefined;
-                    console.error("[ws] Invalid envelope received", {
-                        errors,
-                        envelope,
+                const raw = JSON.parse(event.data);
+
+                // L1: Envelope structure validation
+                const structureValidation = validateEnvelopeStructure(raw);
+                if (!structureValidation.valid) {
+                    validationLogger.logValidationError({
+                        layer: "L1_STRUCTURE",
+                        error: "Invalid envelope structure",
+                        details: structureValidation.errors,
+                        rawEnvelope: raw,
                     });
                     return;
                 }
+
+                const envelope = structureValidation.data as WsEnvelope;
+
+                // L2: Type whitelist validation
+                if (!isValidInboundMessageType(envelope.type)) {
+                    validationLogger.logValidationWarning({
+                        layer: "L2_TYPE_WHITELIST",
+                        messageType: envelope.type,
+                        error: `Unknown message type: ${envelope.type}`,
+                        rawEnvelope: raw,
+                    });
+                    return;
+                }
+
+                // Legacy AJV validation (for backward compatibility)
+                if (this.validateEnvelope && !this.validateEnvelope(envelope)) {
+                    const errors = this.validateEnvelope.errors as ErrorObject[] | null | undefined;
+                    console.error("[ws] Schema validation failed", {
+                        errors,
+                        envelope,
+                    });
+                    // Continue processing even if schema validation fails
+                    // Our new validation is the source of truth
+                }
+
+                const duration = performance.now() - startTime;
+                validationLogger.logValidationMetric(envelope.type, duration);
+
                 this.handleMessage(envelope);
             } catch (e) {
-                console.error("Failed to parse message:", event.data, e);
+                validationLogger.logValidationError({
+                    layer: "L1_STRUCTURE",
+                    error: `Failed to parse JSON: ${e instanceof Error ? e.message : String(e)}`,
+                    rawEnvelope: event.data,
+                });
             }
         };
 
