@@ -31,18 +31,12 @@ type Game struct {
 // NewGame creates a new game with optional RNG for deterministic behavior.
 // If rng is nil, uses default random number generator. Deals cards based on player count:
 // 2-4 players get 3 cards each, 5+ players get 2 cards each.
-func NewGame(playerNames []string, rng *rand.Rand) (*Game, error) {
-	return newGame(playerNames, rng)
-}
-
-// newGame is the constructor where the "World" is initialized.
-// It takes names and gives back a ready-to-play instance.
 //
-// A note on the cardsPerPlayer logic: we scale the starting hand based on the crowd size
+// The cardsPerPlayer logic scales the starting hand based on the crowd size
 // to keep the game's pace and balance tight. 2-4 players get more "lives" (cards)
 // because the game is slower, while 5+ players get fewer to prevent it from dragging
 // too long or running out of deck early.
-func newGame(playerNames []string, rng *rand.Rand) (*Game, error) {
+func NewGame(playerNames []string, rng *rand.Rand) (*Game, error) {
 	if len(playerNames) < 2 {
 		return nil, fmt.Errorf("at least 2 players required")
 	}

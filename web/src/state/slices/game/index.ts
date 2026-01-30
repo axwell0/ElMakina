@@ -142,6 +142,34 @@ interface PlayerEliminatedPayload {
   turn: number;
 }
 
+interface GamePausedPayload {
+  paused_by_player_id: string;
+  paused_by_index: number;
+  paused_by_name: string;
+  deadline_ms: number;
+  duration_ms: number;
+  pause_reason: string;
+  eligible_voters: number[];
+  kick_votes: number[];
+}
+
+interface GameResumedPayload {
+  resumed_by_player_id: string;
+  resumed_by_index: number;
+  resumed_by_name: string;
+  resume_reason: string;
+}
+
+interface KickVoteUpdatePayload {
+  eligible_voters: number[];
+  kick_votes: number[];
+}
+
+interface PlayerKickedPayload {
+  player_index: number;
+  reason: string;
+}
+
 export type GameAction =
   | { type: "LOBBY_STARTED"; payload: LobbyStartedPayload; currentPlayerId: string | null; currentLobby: CurrentLobbyInfo | null }
   | { type: "GAME_CONFIG"; payload: GameConfigPayload | undefined }
@@ -159,6 +187,10 @@ export type GameAction =
   | { type: "CLEAR_TARGETING" }
   | { type: "GAME_OVER"; winnerIndex: number; winnerName: string }
   | { type: "PLAYER_ELIMINATED"; payload: PlayerEliminatedPayload }
+  | { type: "GAME_PAUSED"; payload: GamePausedPayload }
+  | { type: "GAME_RESUMED"; payload: GameResumedPayload }
+  | { type: "KICK_VOTE_UPDATE"; payload: KickVoteUpdatePayload }
+  | { type: "PLAYER_KICKED"; payload: PlayerKickedPayload }
   | { type: "RESET" };
 
 export function gameReducer(
@@ -415,6 +447,66 @@ export function gameReducer(
       };
     }
 
+    case "GAME_PAUSED": {
+      const payload = action.payload;
+      return {
+        ...state,
+        pause: {
+          status: "paused",
+          pausedByPlayerId: payload.paused_by_player_id,
+          pausedByIndex: payload.paused_by_index,
+          pausedByName: payload.paused_by_name,
+          deadlineMs: payload.deadline_ms,
+          durationMs: payload.duration_ms,
+          pauseReason: payload.pause_reason,
+          eligibleVoters: payload.eligible_voters,
+          kickVotes: payload.kick_votes,
+        },
+      };
+    }
+
+    case "GAME_RESUMED": {
+      const payload = action.payload;
+      return {
+        ...state,
+        pause: {
+          status: "resumed",
+          resumedByPlayerId: payload.resumed_by_player_id,
+          resumedByIndex: payload.resumed_by_index,
+          resumedByName: payload.resumed_by_name,
+          resumeReason: payload.resume_reason,
+        },
+      };
+    }
+
+    case "KICK_VOTE_UPDATE": {
+      const payload = action.payload;
+      if (state.pause.status !== "paused") {
+        return state;
+      }
+      return {
+        ...state,
+        pause: {
+          ...state.pause,
+          eligibleVoters: payload.eligible_voters,
+          kickVotes: payload.kick_votes,
+        },
+      };
+    }
+
+    case "PLAYER_KICKED": {
+      const payload = action.payload;
+      return {
+        ...state,
+        players: state.players.map((player) =>
+          player.index === payload.player_index
+            ? { ...player, alive: false, cardCount: 0 }
+            : player
+        ),
+        pause: { status: "inactive" },
+      };
+    }
+
     case "RESET":
       return initialGameSliceState;
 
@@ -518,6 +610,22 @@ export const gameActions = {
   }),
   playerEliminated: (payload: PlayerEliminatedPayload): GameAction => ({
     type: "PLAYER_ELIMINATED",
+    payload,
+  }),
+  gamePaused: (payload: GamePausedPayload): GameAction => ({
+    type: "GAME_PAUSED",
+    payload,
+  }),
+  gameResumed: (payload: GameResumedPayload): GameAction => ({
+    type: "GAME_RESUMED",
+    payload,
+  }),
+  kickVoteUpdate: (payload: KickVoteUpdatePayload): GameAction => ({
+    type: "KICK_VOTE_UPDATE",
+    payload,
+  }),
+  playerKicked: (payload: PlayerKickedPayload): GameAction => ({
+    type: "PLAYER_KICKED",
     payload,
   }),
   reset: (): GameAction => ({ type: "RESET" }),

@@ -469,6 +469,114 @@ export function rootReducer(
           };
         }
 
+        case "game_paused": {
+          const payload = envelope.payload as {
+            paused_by_player_id: string;
+            paused_by_index: number;
+            paused_by_name: string;
+            deadline_ms: number;
+            duration_ms: number;
+            pause_reason: string;
+            eligible_voters: number[];
+            kick_votes: number[];
+          };
+          return {
+            ...state,
+            game: gameReducer(
+              state.game,
+              gameActions.gamePaused(payload)
+            ),
+            ui: uiReducer(state.ui, uiActions.updateTimestamp()),
+          };
+        }
+
+        case "game_resumed": {
+          const payload = envelope.payload as {
+            resumed_by_player_id: string;
+            resumed_by_index: number;
+            resumed_by_name: string;
+            resume_reason: string;
+          };
+          return {
+            ...state,
+            game: gameReducer(
+              state.game,
+              gameActions.gameResumed(payload)
+            ),
+            ui: uiReducer(state.ui, uiActions.updateTimestamp()),
+          };
+        }
+
+        case "kick_vote_update": {
+          const payload = envelope.payload as {
+            eligible_voters: number[];
+            kick_votes: number[];
+          };
+          return {
+            ...state,
+            game: gameReducer(
+              state.game,
+              gameActions.kickVoteUpdate(payload)
+            ),
+            ui: uiReducer(state.ui, uiActions.updateTimestamp()),
+          };
+        }
+
+        case "player_kicked": {
+          const payload = envelope.payload as {
+            player_index: number;
+            reason: string;
+          };
+          return {
+            ...state,
+            game: gameReducer(
+              state.game,
+              gameActions.playerKicked(payload)
+            ),
+            ui: uiReducer(state.ui, uiActions.updateTimestamp()),
+          };
+        }
+
+        case "investigate_result": {
+          const payload = envelope.payload as {
+            target_name: string;
+            role: string;
+          };
+          return {
+            ...state,
+            ui: uiReducer(
+              state.ui,
+              uiActions.investigateResult({
+                targetName: payload.target_name,
+                role: payload.role,
+              })
+            ),
+          };
+        }
+
+        case "chat_message": {
+          const payload = envelope.payload as {
+            id: string;
+            senderIndex: number;
+            senderName: string;
+            text: string;
+            timestamp: number;
+          };
+          return {
+            ...state,
+            ui: uiReducer(
+              state.ui,
+              uiActions.chatMessage({
+                id: payload.id,
+                senderIndex: payload.senderIndex,
+                senderName: payload.senderName,
+                text: payload.text,
+                timestamp: payload.timestamp,
+              })
+            ),
+          };
+        }
+
         default:
           // Unknown message type - just update timestamp
           return {
