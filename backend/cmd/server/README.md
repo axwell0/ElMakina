@@ -20,13 +20,28 @@ It wires the lobby manager, game engine, and replay recorder.
 - `ELMAKINA_TURN_TIMEOUT` (default `20s`)
 - `ELMAKINA_POSTGRES_DSN` (required for replay storage)
 - `ELMAKINA_REPLAY_AUTOMIGRATE` (default `false`)
-- `ELMAKINA_LOBBY_STORE_PATH` (optional file-based lobby persistence)
+- `ELMAKINA_CORS_ORIGINS` (default `http://localhost:3000,http://127.0.0.1:3000`)
 
 ## CORS
 
-Allowed origins are currently restricted to `http://localhost:3000` and
-`http://127.0.0.1:3000`. Adjust `withCORS` in `cmd/server/main.go` if you need
-additional origins in development.
+CORS origins are configurable via `ELMAKINA_CORS_ORIGINS`. Set to comma-separated
+list of allowed origins, or use `*` wildcard to allow all origins.
+
+**Examples:**
+```bash
+# Development (default)
+ELMAKINA_CORS_ORIGINS="http://localhost:3000,http://127.0.0.1:3000"
+
+# Production
+ELMAKINA_CORS_ORIGINS="https://myapp.com"
+
+# Allow all (not recommended for production)
+ELMAKINA_CORS_ORIGINS="*"
+```
+
+## Health Check
+
+The `/ready` endpoint returns 200 OK when the server is ready to accept requests.
 
 ## Replay Endpoint
 
