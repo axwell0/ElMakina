@@ -133,7 +133,7 @@ func buildTurnConfig(cfg config) engine.TurnConfig {
 
 // buildLobbyServer wires persistence and orchestration into a WS lobby server.
 func buildLobbyServer(cfg config) (*ws.Server, replay.Recorder, error) {
-	manager, err := ws.NewLobbyManagerFromEnv(2, 9)
+	manager, _, err := ws.NewLobbyManagerFromEnv(2, 9)
 	if err != nil {
 		return nil, nil, err
 	}
