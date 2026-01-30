@@ -4,7 +4,7 @@
  * Manages lobby list and current lobby state.
  */
 
-import type { LobbyState, LobbySummary } from "@/store/types";
+import type { LobbyState, LobbySummary } from "@/state/types";
 
 export interface LobbySliceState {
   lobbies: LobbySummary[];

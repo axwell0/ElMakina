@@ -1,4 +1,4 @@
-import type { GameState } from "@/store/types";
+import type { GameState } from "@/state/types";
 import type { WsEnvelope } from "@/network/socket";
 
 // Import slices

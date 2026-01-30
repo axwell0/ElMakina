@@ -8,7 +8,7 @@ import {Card, CardContent} from '@/components/ui/card';
 import {Input} from '@/components/ui/input';
 import {ScrollArea} from '@/components/ui/scroll-area';
 import {cn} from '@/lib/utils';
-import type {ReplayEntry} from '@/store/types';
+import type {ReplayEntry} from '@/state/types';
 
 const dateFormatter = new Intl.DateTimeFormat('en-US', {
     month: 'short',

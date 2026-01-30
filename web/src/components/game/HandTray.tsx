@@ -1,7 +1,7 @@
 import React from 'react';
 import {AnimatePresence} from 'framer-motion';
 import {Card} from '@/components/Card';
-import type {HandCard} from '@/store/types';
+import type {HandCard} from '@/state/types';
 
 type HandTrayProps = {
     hand: HandCard[];

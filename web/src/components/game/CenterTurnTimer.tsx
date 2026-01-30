@@ -1,6 +1,6 @@
 import React from 'react';
 import {motion, useMotionValue} from 'framer-motion';
-import type {PlayerSnapshot, TurnTimerState} from '@/store/types';
+import type {PlayerSnapshot, TurnTimerState} from '@/state/types';
 import {Timer} from 'lucide-react';
 
 const nowMs = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
