@@ -19,7 +19,7 @@ build-web:
 	bun run --cwd web build
 
 docker:
-	docker compose up
+	docker compose -f docker-compose.yml up
 
 docs-generate:
 	bash scripts/generate-go-docs.sh
