@@ -49,20 +49,36 @@ const PlayerRingBase: React.FC<PlayerRingProps> = ({
                 const pos = opponentPositions[i];
                 if (!pos) return null;
 
-                const isTargetable = Boolean(
+                const isTargetingMode = Boolean(
                     identity &&
                     targeting?.active &&
                     targeting.requestId &&
                     targeting.actionId &&
                     pendingPrompt?.kind === "action" &&
                     pendingPrompt.requestId === targeting.requestId &&
-                    player.alive &&
                     player.index !== identity.playerIndex
                 );
+
+                // Check if player meets action-specific requirements
+                const meetsActionRequirements = (() => {
+                    if (!isTargetingMode || !player.alive) return false;
+                    const actionId = targeting?.actionId;
+                    if (actionId === "steal") {
+                        return (player.coins ?? 0) >= 2;
+                    }
+                    return true;
+                })();
+
+                const isTargetable = isTargetingMode && meetsActionRequirements;
 
 
 
                 const coinCount = player.coins ?? 0;
+
+                const isInvalidTarget = isTargetingMode && !meetsActionRequirements;
+                const invalidReason = isInvalidTarget && targeting?.actionId === "steal"
+                    ? "Need 2+ coins to steal"
+                    : null;
                 const roles = revealHands ? handsByIndex?.[player.index] ?? [] : [];
                 const isStrikeTarget = strikePulse?.targetIndex === player.index;
                 const cardCount = player.cardCount ?? 0;
@@ -84,12 +100,20 @@ const PlayerRingBase: React.FC<PlayerRingProps> = ({
                                 "w-[clamp(3.5rem,8vw,5rem)] h-[clamp(3.5rem,8vw,5rem)]",
                                 isActive ? "border-2 border-accent ring-4 ring-accent/20 shadow-[0_0_20px_rgba(251,191,36,0.4)]" : "border-2 border-border",
                                 !player.alive && "opacity-50 grayscale border-dashed",
-                                isTargetable && "cursor-pointer hover:scale-105 hover:border-accent hover:shadow-[0_0_15px_rgba(251,191,36,0.4)]"
+                                isTargetable && "cursor-pointer hover:scale-105 hover:border-accent hover:shadow-[0_0_15px_rgba(251,191,36,0.4)]",
+                                isInvalidTarget && "opacity-60 border-muted-foreground/30 cursor-not-allowed"
                             )}
                         >
                             {isTargetable && player.alive && (
                                 <div className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-primary flex items-center justify-center shadow-lg border-2 border-accent animate-[spin_3s_linear_infinite] z-30">
                                     <Target className="h-3 w-3 text-primary-foreground" />
+                                </div>
+                            )}
+                            {isInvalidTarget && (
+                                <div className="absolute inset-0 flex items-center justify-center z-30 pointer-events-none">
+                                    <div className="px-2 py-0.5 rounded bg-destructive/90 text-destructive-foreground text-[10px] font-semibold shadow-md">
+                                        {invalidReason}
+                                    </div>
                                 </div>
                             )}
 
