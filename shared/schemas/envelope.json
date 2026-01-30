@@ -1,0 +1,1813 @@
+{
+  "$defs": {
+    "Action": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/EnvelopeBase"
+        },
+        {
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/ActionPayload"
+            },
+            "type": {
+              "const": "action"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ActionPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "guess": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "main_action": {
+          "type": "string"
+        },
+        "pass": {
+          "type": "boolean"
+        },
+        "source_index": {
+          "type": "integer"
+        },
+        "target_index": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "source_index"
+      ],
+      "type": "object"
+    },
+    "Challenge": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/EnvelopeBase"
+        },
+        {
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/ChallengePayload"
+            },
+            "type": {
+              "const": "challenge"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ChallengePayload": {
+      "additionalProperties": false,
+      "properties": {
+        "actor_discard_index": {
+          "type": "integer"
+        },
+        "actor_proving_card_index": {
+          "type": "integer"
+        },
+        "challenger_discard_index": {
+          "type": "integer"
+        },
+        "challenger_index": {
+          "type": "integer"
+        },
+        "pass": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "challenger_index",
+        "challenger_discard_index",
+        "actor_discard_index",
+        "actor_proving_card_index"
+      ],
+      "type": "object"
+    },
+    "ChallengeWindow": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/EnvelopeBase"
+        },
+        {
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/ChallengeWindowPayload"
+            },
+            "type": {
+              "const": "challenge_window"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ChallengeWindowPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "action_id": {
+          "type": "string"
+        },
+        "actor_index": {
+          "type": "integer"
+        },
+        "claimed_role": {
+          "type": "string"
+        },
+        "eligible": {
+          "type": "boolean"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "prompt": {
+          "type": "string"
+        },
+        "target_index": {
+          "type": "integer"
+        },
+        "timeout_ms": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "actor_index",
+        "action_id",
+        "claimed_role",
+        "kind",
+        "eligible"
+      ],
+      "type": "object"
+    },
+    "ChatMessage": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/EnvelopeBase"
+        },
+        {
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/ChatMessagePayload"
+            },
+            "type": {
+              "const": "chat_message"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ChatMessagePayload": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "senderIndex": {
+          "type": "integer"
+        },
+        "senderName": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "timestamp": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "senderIndex",
+        "senderName",
+        "text",
+        "timestamp"
+      ],
+      "type": "object"
+    },
+    "Counter": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/EnvelopeBase"
+        },
+        {
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/ActionPayload"
+            },
+            "type": {
+              "const": "counter"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "CounterWindow": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/EnvelopeBase"
+        },
+        {
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/CounterWindowPayload"
+            },
+            "type": {
+              "const": "counter_window"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "CounterWindowPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "action_id": {
+          "type": "string"
+        },
+        "actor_index": {
+          "type": "integer"
+        },
+        "allowed_actions": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "eligible": {
+          "type": "boolean"
+        },
+        "prompt": {
+          "type": "string"
+        },
+        "target_index": {
+          "type": "integer"
+        },
+        "timeout_ms": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "actor_index",
+        "action_id",
+        "eligible"
+      ],
+      "type": "object"
+    },
+    "EnvelopeBase": {
+      "additionalProperties": false,
+      "properties": {
+        "payload": {},
+        "request_id": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "GameConfig": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/EnvelopeBase"
+        },
+        {
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/GameConfigPayload"
+            },
+            "type": {
+              "const": "game_config"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "GameConfigPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "roles": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "roles"
+      ],
+      "type": "object"
+    },
+    "GameLog": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/EnvelopeBase"
+        },
+        {
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/GameLogPayload"
+            },
+            "type": {
+              "const": "game_log"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "GameLogPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "message": {
+          "type": "string"
+        },
+        "player_index": {
+          "type": "integer"
+        },
+        "scope": {
+          "type": "string"
+        },
+        "turn": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "turn",
+        "scope",
+        "message"
+      ],
+      "type": "object"
+    },
+    "GameOver": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/EnvelopeBase"
+        },
+        {
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/GameOverPayload"
+            },
+            "type": {
+              "const": "game_over"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "GameOverPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "winner_index": {
+          "type": "integer"
+        },
+        "winner_name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "winner_index",
+        "winner_name"
+      ],
+      "type": "object"
+    },
+    "GamePaused": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/EnvelopeBase"
+        },
+        {
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/GamePausedPayload"
+            },
+            "type": {
+              "const": "game_paused"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "GamePausedPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "deadline_ms": {
+          "type": "integer"
+        },
+        "duration_ms": {
+          "type": "integer"
+        },
+        "eligible_voters": {
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "kick_votes": {
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "pause_reason": {
+          "type": "string"
+        },
+        "paused_by_index": {
+          "type": "integer"
+        },
+        "paused_by_name": {
+          "type": "string"
+        },
+        "paused_by_player_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "paused_by_player_id",
+        "paused_by_index",
+        "paused_by_name",
+        "deadline_ms",
+        "duration_ms",
+        "pause_reason",
+        "eligible_voters",
+        "kick_votes"
+      ],
+      "type": "object"
+    },
+    "GameResumed": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/EnvelopeBase"
+        },
+        {
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/GameResumedPayload"
+            },
+            "type": {
+              "const": "game_resumed"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "GameResumedPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "resume_reason": {
+          "type": "string"
+        },
+        "resumed_by_index": {
+          "type": "integer"
+        },
+        "resumed_by_name": {
+          "type": "string"
+        },
+        "resumed_by_player_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "resumed_by_player_id",
+        "resumed_by_index",
+        "resumed_by_name",
+        "resume_reason"
+      ],
+      "type": "object"
+    },
+    "GameState": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/EnvelopeBase"
+        },
+        {
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/GameStatePayload"
+            },
+            "type": {
+              "const": "game_state"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "GameStatePayload": {
+      "$defs": {
+        "PlayerStatePayload": {
+          "additionalProperties": false,
+          "properties": {
+            "alive": {
+              "type": "boolean"
+            },
+            "avatar": {
+              "type": "string"
+            },
+            "card_count": {
+              "type": "integer"
+            },
+            "coins": {
+              "type": "integer"
+            },
+            "index": {
+              "type": "integer"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "index",
+            "name",
+            "coins",
+            "card_count",
+            "alive"
+          ],
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "active_player_index": {
+          "type": "integer"
+        },
+        "players": {
+          "items": {
+            "$ref": "#/$defs/PlayerStatePayload"
+          },
+          "type": "array"
+        },
+        "turn_number": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "turn_number",
+        "active_player_index",
+        "players"
+      ],
+      "type": "object"
+    },
+    "HandState": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/EnvelopeBase"
+        },
+        {
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/HandStatePayload"
+            },
+            "type": {
+              "const": "hand_state"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "HandStatePayload": {
+      "additionalProperties": false,
+      "properties": {
+        "hand": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "player_index": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "player_index",
+        "hand"
+      ],
+      "type": "object"
+    },
+    "Hello": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/EnvelopeBase"
+        },
+        {
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/HelloPayload"
+            },
+            "type": {
+              "const": "hello"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "HelloAck": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/EnvelopeBase"
+        },
+        {
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/HelloAckPayload"
+            },
+            "type": {
+              "const": "hello_ack"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "HelloAckPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "player_id": {
+          "type": "string"
+        },
+        "token": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "player_id",
+        "token"
+      ],
+      "type": "object"
+    },
+    "HelloError": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/EnvelopeBase"
+        },
+        {
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/HelloErrorPayload"
+            },
+            "type": {
+              "const": "hello_error"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "HelloErrorPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "error": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "error"
+      ],
+      "type": "object"
+    },
+    "HelloPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "avatar": {
+          "type": "string"
+        },
+        "nickname": {
+          "type": "string"
+        },
+        "reconnect_token": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "nickname"
+      ],
+      "type": "object"
+    },
+    "InvestigateResult": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/EnvelopeBase"
+        },
+        {
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/InvestigateResultPayload"
+            },
+            "type": {
+              "const": "investigate_result"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "InvestigateResultPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "role": {
+          "type": "string"
+        },
+        "target_name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "target_name",
+        "role"
+      ],
+      "type": "object"
+    },
+    "KickVote": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/EnvelopeBase"
+        },
+        {
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/KickVotePayload"
+            },
+            "type": {
+              "const": "kick_vote"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "KickVotePayload": {
+      "additionalProperties": false,
+      "properties": {
+        "target_index": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "target_index"
+      ],
+      "type": "object"
+    },
+    "KickVoteUpdate": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/EnvelopeBase"
+        },
+        {
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/KickVoteUpdatePayload"
+            },
+            "type": {
+              "const": "kick_vote_update"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "KickVoteUpdatePayload": {
+      "additionalProperties": false,
+      "properties": {
+        "eligible_voters": {
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "kick_votes": {
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "eligible_voters",
+        "kick_votes"
+      ],
+      "type": "object"
+    },
+    "LobbyCreate": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/EnvelopeBase"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "lobby_create"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "LobbyCreated": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/EnvelopeBase"
+        },
+        {
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/LobbyCreatedPayload"
+            },
+            "type": {
+              "const": "lobby_created"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "LobbyCreatedPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "lobby_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "lobby_id"
+      ],
+      "type": "object"
+    },
+    "LobbyError": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/EnvelopeBase"
+        },
+        {
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/LobbyErrorPayload"
+            },
+            "type": {
+              "const": "lobby_error"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "LobbyErrorPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "error": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "error"
+      ],
+      "type": "object"
+    },
+    "LobbyJoin": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/EnvelopeBase"
+        },
+        {
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/LobbyJoinPayload"
+            },
+            "type": {
+              "const": "lobby_join"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "LobbyJoinPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "lobby_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "lobby_id"
+      ],
+      "type": "object"
+    },
+    "LobbyJoined": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/EnvelopeBase"
+        },
+        {
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/LobbyJoinPayload"
+            },
+            "type": {
+              "const": "lobby_joined"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "LobbyList": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/EnvelopeBase"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "lobby_list"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "LobbyListPayload": {
+      "$defs": {
+        "LobbySummaryPayload": {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "leader_id": {
+              "type": "string"
+            },
+            "leader_nick": {
+              "type": "string"
+            },
+            "player_avatars": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "player_count": {
+              "type": "integer"
+            },
+            "player_ids": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "player_nicks": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "status": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "leader_nick",
+            "leader_id",
+            "player_count",
+            "status"
+          ],
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "lobbies": {
+          "items": {
+            "$ref": "#/$defs/LobbySummaryPayload"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "lobbies"
+      ],
+      "type": "object"
+    },
+    "LobbyListResult": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/EnvelopeBase"
+        },
+        {
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/LobbyListPayload"
+            },
+            "type": {
+              "const": "lobby_list_result"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "LobbyStart": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/EnvelopeBase"
+        },
+        {
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/LobbyStartPayload"
+            },
+            "type": {
+              "const": "lobby_start"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "LobbyStartPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "lobby_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "lobby_id"
+      ],
+      "type": "object"
+    },
+    "LobbyStarted": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/EnvelopeBase"
+        },
+        {
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/LobbyStartedPayload"
+            },
+            "type": {
+              "const": "lobby_started"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "LobbyStartedPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "index_mapping": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "type": "object"
+        },
+        "lobby_id": {
+          "type": "string"
+        },
+        "match_id": {
+          "type": "string"
+        },
+        "player_avatars": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "player_count": {
+          "type": "integer"
+        },
+        "player_index": {
+          "type": "integer"
+        },
+        "player_names": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "lobby_id",
+        "match_id",
+        "player_index",
+        "player_count",
+        "player_names",
+        "index_mapping"
+      ],
+      "type": "object"
+    },
+    "LobbyState": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/EnvelopeBase"
+        },
+        {
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/LobbyStatePayload"
+            },
+            "type": {
+              "const": "lobby_state"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "LobbyStatePayload": {
+      "additionalProperties": false,
+      "properties": {
+        "leader_id": {
+          "type": "string"
+        },
+        "leader_nick": {
+          "type": "string"
+        },
+        "lobby_id": {
+          "type": "string"
+        },
+        "player_avatars": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "player_count": {
+          "type": "integer"
+        },
+        "player_ids": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "player_nicks": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "lobby_id",
+        "leader_nick",
+        "leader_id",
+        "player_nicks",
+        "player_ids",
+        "player_count",
+        "status"
+      ],
+      "type": "object"
+    },
+    "LobbySummaryPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "leader_id": {
+          "type": "string"
+        },
+        "leader_nick": {
+          "type": "string"
+        },
+        "player_avatars": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "player_count": {
+          "type": "integer"
+        },
+        "player_ids": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "player_nicks": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "leader_nick",
+        "leader_id",
+        "player_count",
+        "status"
+      ],
+      "type": "object"
+    },
+    "PlayerEliminated": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/EnvelopeBase"
+        },
+        {
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/PlayerEliminatedPayload"
+            },
+            "type": {
+              "const": "player_eliminated"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "PlayerEliminatedPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "player_index": {
+          "type": "integer"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "turn": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "player_index",
+        "reason",
+        "turn"
+      ],
+      "type": "object"
+    },
+    "PlayerKicked": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/EnvelopeBase"
+        },
+        {
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/PlayerKickedPayload"
+            },
+            "type": {
+              "const": "player_kicked"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "PlayerKickedPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "player_index": {
+          "type": "integer"
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "player_index",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "PlayerStatePayload": {
+      "additionalProperties": false,
+      "properties": {
+        "alive": {
+          "type": "boolean"
+        },
+        "avatar": {
+          "type": "string"
+        },
+        "card_count": {
+          "type": "integer"
+        },
+        "coins": {
+          "type": "integer"
+        },
+        "index": {
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "index",
+        "name",
+        "coins",
+        "card_count",
+        "alive"
+      ],
+      "type": "object"
+    },
+    "PromptClosed": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/EnvelopeBase"
+        },
+        {
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/PromptClosedPayload"
+            },
+            "type": {
+              "const": "prompt_closed"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "PromptClosedPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "reason"
+      ],
+      "type": "object"
+    },
+    "RequestAction": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/EnvelopeBase"
+        },
+        {
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/RequestActionPayload"
+            },
+            "type": {
+              "const": "request_action"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "RequestActionPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "actor_index": {
+          "type": "integer"
+        },
+        "allowed_actions": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "prompt": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "actor_index"
+      ],
+      "type": "object"
+    },
+    "RequestStep": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/EnvelopeBase"
+        },
+        {
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/RequestStepPayload"
+            },
+            "type": {
+              "const": "request_step"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "RequestStepPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "prompt": {
+          "type": "string"
+        },
+        "step": true
+      },
+      "required": [
+        "step"
+      ],
+      "type": "object"
+    },
+    "StepRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "action_id": {
+          "type": "string"
+        },
+        "actor_index": {
+          "type": "integer"
+        },
+        "context": {
+          "type": "string"
+        },
+        "count": {
+          "type": "integer"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "options": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "action_id",
+        "kind",
+        "actor_index",
+        "count",
+        "context"
+      ],
+      "type": "object"
+    },
+    "StepResult": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/EnvelopeBase"
+        },
+        {
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/StepResultPayload"
+            },
+            "type": {
+              "const": "step_result"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "StepResultPayload": {
+      "oneOf": [
+        {
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        {
+          "type": "object"
+        },
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "integer"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "TurnTimer": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/EnvelopeBase"
+        },
+        {
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/TurnTimerPayload"
+            },
+            "type": {
+              "const": "turn_timer"
+            }
+          },
+          "required": [
+            "type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "TurnTimerPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "active_player_index": {
+          "type": "integer"
+        },
+        "duration_ms": {
+          "type": "integer"
+        },
+        "state": {
+          "type": "string"
+        },
+        "turn_number": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "active_player_index",
+        "turn_number",
+        "duration_ms",
+        "state"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://elmakina.example/schemas/ws-envelope.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/Hello"
+    },
+    {
+      "$ref": "#/$defs/HelloAck"
+    },
+    {
+      "$ref": "#/$defs/HelloError"
+    },
+    {
+      "$ref": "#/$defs/LobbyCreate"
+    },
+    {
+      "$ref": "#/$defs/LobbyList"
+    },
+    {
+      "$ref": "#/$defs/LobbyJoin"
+    },
+    {
+      "$ref": "#/$defs/LobbyStart"
+    },
+    {
+      "$ref": "#/$defs/LobbyCreated"
+    },
+    {
+      "$ref": "#/$defs/LobbyJoined"
+    },
+    {
+      "$ref": "#/$defs/LobbyListResult"
+    },
+    {
+      "$ref": "#/$defs/LobbyStarted"
+    },
+    {
+      "$ref": "#/$defs/LobbyState"
+    },
+    {
+      "$ref": "#/$defs/LobbyError"
+    },
+    {
+      "$ref": "#/$defs/RequestAction"
+    },
+    {
+      "$ref": "#/$defs/RequestStep"
+    },
+    {
+      "$ref": "#/$defs/ChallengeWindow"
+    },
+    {
+      "$ref": "#/$defs/CounterWindow"
+    },
+    {
+      "$ref": "#/$defs/Action"
+    },
+    {
+      "$ref": "#/$defs/Challenge"
+    },
+    {
+      "$ref": "#/$defs/Counter"
+    },
+    {
+      "$ref": "#/$defs/StepResult"
+    },
+    {
+      "$ref": "#/$defs/GameLog"
+    },
+    {
+      "$ref": "#/$defs/GameOver"
+    },
+    {
+      "$ref": "#/$defs/GameState"
+    },
+    {
+      "$ref": "#/$defs/GameConfig"
+    },
+    {
+      "$ref": "#/$defs/PromptClosed"
+    },
+    {
+      "$ref": "#/$defs/InvestigateResult"
+    },
+    {
+      "$ref": "#/$defs/HandState"
+    },
+    {
+      "$ref": "#/$defs/PlayerEliminated"
+    },
+    {
+      "$ref": "#/$defs/TurnTimer"
+    },
+    {
+      "$ref": "#/$defs/GamePaused"
+    },
+    {
+      "$ref": "#/$defs/GameResumed"
+    },
+    {
+      "$ref": "#/$defs/KickVote"
+    },
+    {
+      "$ref": "#/$defs/KickVoteUpdate"
+    },
+    {
+      "$ref": "#/$defs/PlayerKicked"
+    },
+    {
+      "$ref": "#/$defs/ChatMessage"
+    }
+  ],
+  "title": "ElMakina WebSocket Envelope",
+  "type": "object"
+}

@@ -1,0 +1,33 @@
+name: WS Contract (backend)
+
+on:
+  push:
+    paths:
+      - '../../backend/docs/ws_schema/envelope.json'
+      - '../../backend/server/ws/**'
+      - '../../backend/scripts/check-ws-contract.sh'
+      - 'go.mod'
+      - 'go.sum'
+  pull_request:
+    paths:
+      - '../../backend/docs/ws_schema/envelope.json'
+      - '../../backend/server/ws/**'
+      - '../../backend/scripts/check-ws-contract.sh'
+      - 'go.mod'
+      - 'go.sum'
+
+jobs:
+  check-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Verify WS contract examples
+        run: ./scripts/check-ws-contract.sh

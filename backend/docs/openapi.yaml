@@ -1,0 +1,24 @@
+openapi: 3.1.0
+info:
+  title: ElMakina API
+  version: 1.0.0
+  description: |
+    WebSocket-based API for ElMakina.
+
+    The WebSocket protocol and payload schemas are documented in:
+    - docs/ws_contract.md
+    - docs/ws_schema/envelope.json
+paths:
+  /ws:
+    get:
+      summary: WebSocket upgrade
+      description: |
+        Upgrades the HTTP connection to a WebSocket.
+        All messages follow the WSEnvelope schema.
+      responses:
+        "101":
+          description: Switching Protocols
+components:
+  schemas:
+    WSEnvelope:
+      $ref: ../../shared/schemas/envelope.json
