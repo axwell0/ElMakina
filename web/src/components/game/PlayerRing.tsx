@@ -20,6 +20,7 @@ type PlayerRingProps = {
     handsByIndex?: Record<number, string[]>;
     onActionSent?: (payload: { actionId: string; sourceIndex: number; targetIndex: number }) => void;
     strikePulse?: { id: string; targetIndex: number } | null;
+    eliminatingPlayer?: number | null;
 };
 
 const PlayerRingBase: React.FC<PlayerRingProps> = ({
@@ -34,6 +35,7 @@ const PlayerRingBase: React.FC<PlayerRingProps> = ({
     handsByIndex,
     onActionSent,
     strikePulse,
+    eliminatingPlayer,
 }) => {
     const enemies = players.filter(player => player.index !== identity?.playerIndex);
     const activeTimer = turnTimer?.running ? turnTimer : null;
@@ -46,6 +48,7 @@ const PlayerRingBase: React.FC<PlayerRingProps> = ({
         <div className="absolute inset-0 pointer-events-auto">
             {enemies.map((player, i) => {
                 const isActive = activePlayerIndex === player.index;
+                const isBeingEliminated = eliminatingPlayer === player.index;
                 const pos = opponentPositions[i];
                 if (!pos) return null;
 
@@ -100,6 +103,7 @@ const PlayerRingBase: React.FC<PlayerRingProps> = ({
                                 "w-[clamp(3.5rem,8vw,5rem)] h-[clamp(3.5rem,8vw,5rem)]",
                                 isActive ? "border-2 border-accent ring-4 ring-accent/20 shadow-[0_0_20px_rgba(251,191,36,0.4)]" : "border-2 border-border",
                                 !player.alive && "opacity-50 grayscale border-dashed",
+                                isBeingEliminated && "animate-elimination-pulse",
                                 isTargetable && "cursor-pointer hover:scale-105 hover:border-accent hover:shadow-[0_0_15px_rgba(251,191,36,0.4)]",
                                 isInvalidTarget && "opacity-60 border-muted-foreground/30 cursor-not-allowed"
                             )}
