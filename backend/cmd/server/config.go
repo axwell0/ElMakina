@@ -21,6 +21,7 @@ const (
 	envTurnTimeout       = "ELMAKINA_TURN_TIMEOUT"
 	envPostgresDSN       = "ELMAKINA_POSTGRES_DSN"
 	envReplayAutoMigrate = "ELMAKINA_REPLAY_AUTOMIGRATE"
+	envCORSOrigins       = "ELMAKINA_CORS_ORIGINS"
 )
 
 type config struct {
@@ -32,6 +33,7 @@ type config struct {
 	TurnTimeout       time.Duration
 	PostgresDSN       string
 	ReplayAutoMigrate bool
+	CORSOrigins       []string
 }
 
 // loadConfigFromEnv builds server configuration from environment variables.
@@ -45,6 +47,7 @@ func loadConfigFromEnv() (config, error) {
 		CounterTimeout:    15 * time.Second,
 		TurnTimeout:       20 * time.Second,
 		ReplayAutoMigrate: false,
+		CORSOrigins:       []string{"http://localhost:3000", "http://127.0.0.1:3000"},
 	}
 
 	if val := os.Getenv(envHTTPAddr); val != "" {
@@ -87,7 +90,23 @@ func loadConfigFromEnv() (config, error) {
 	if val := os.Getenv(envReplayAutoMigrate); val != "" {
 		cfg.ReplayAutoMigrate = val == "true" || val == "1" || val == "yes"
 	}
+	if val := os.Getenv(envCORSOrigins); val != "" {
+		cfg.CORSOrigins = parseOrigins(val)
+	}
 	return cfg, nil
+}
+
+// parseOrigins splits comma-separated origins. Empty strings are filtered out.
+func parseOrigins(val string) []string {
+	parts := strings.Split(val, ",")
+	var origins []string
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			origins = append(origins, p)
+		}
+	}
+	return origins
 }
 
 // loadDotEnv reads key=value pairs into the process environment.
