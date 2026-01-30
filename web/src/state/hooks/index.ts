@@ -10,3 +10,10 @@ export {
   useJsonStorageSync,
   useTypedStorageSync,
 } from "./useStorageSync";
+
+export {
+  useGameSlice,
+  usePause,
+  useIdentity,
+  useIsConnected,
+} from "./useGameSlice";
