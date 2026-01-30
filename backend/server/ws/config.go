@@ -11,11 +11,6 @@ import (
 	"gorm.io/gorm"
 )
 
-const (
-	// EnvLobbyStorePath is deprecated. PostgreSQL is now used exclusively.
-	EnvLobbyStorePath = "ELMAKINA_LOBBY_STORE_PATH"
-)
-
 // NewLobbyManagerFromEnv builds a lobby manager using PostgreSQL persistence.
 // This function opens a PostgreSQL connection using the DSN from ELMAKINA_POSTGRES_DSN.
 // Deprecated: Use NewLobbyManagerWithDB instead for better control over the database connection.
