@@ -10,9 +10,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/skia-dev/go2ts"
 	"ElMakina/backend/models"
 	"ElMakina/backend/server/ws"
+	"github.com/skia-dev/go2ts"
 )
 
 func main() {
@@ -21,7 +21,7 @@ func main() {
 	// ============================================================================
 	// CORE ENUMS (from backend/models)
 	// ============================================================================
-	
+
 	// ActionID - All possible player actions
 	generator.Add(models.Business)
 	generator.Add(models.BlockForeignAid)
@@ -57,7 +57,7 @@ func main() {
 	// ============================================================================
 	// PAYLOAD TYPES (from backend/models)
 	// ============================================================================
-	
+
 	generator.Add(models.TargetPayload{})
 	generator.Add(models.AccusePayload{})
 	generator.Add(models.NoPayload{})
@@ -66,7 +66,7 @@ func main() {
 	// ============================================================================
 	// WEBSOCKET MESSAGE PAYLOADS (from backend/server/ws)
 	// ============================================================================
-	
+
 	// Lobby payloads
 	generator.Add(ws.HelloPayload{})
 	generator.Add(ws.HelloAckPayload{})
@@ -107,10 +107,13 @@ func main() {
 	generator.Add(ws.KickVoteUpdatePayload{})
 	generator.Add(ws.PlayerKickedPayload{})
 
+	// Card discard payload
+	generator.Add(ws.CardDiscardedPayload{})
+
 	// ============================================================================
 	// RENDER OUTPUT
 	// ============================================================================
-	
+
 	var buf bytes.Buffer
 	if err := generator.Render(&buf); err != nil {
 		fmt.Fprintf(os.Stderr, "Error generating types: %v\n", err)
@@ -139,7 +142,7 @@ func main() {
 	}
 
 	outputPath := filepath.Join(rootDir, "web", "src", "types", "generated.ts")
-	
+
 	// Ensure directory exists
 	dir := filepath.Dir(outputPath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -161,10 +164,10 @@ func main() {
 func postProcessTypes(input string) string {
 	// Fix any known issues with go2ts output
 	output := input
-	
+
 	// Ensure consistent naming (go2ts should handle this, but let's be safe)
 	output = strings.ReplaceAll(output, "__", "_")
-	
+
 	return output
 }
 
@@ -180,7 +183,7 @@ func findProjectRoot() (string, error) {
 		// Check if this directory has both backend/ and web/ subdirectories
 		backendDir := filepath.Join(dir, "backend")
 		webDir := filepath.Join(dir, "web")
-		
+
 		if _, err := os.Stat(backendDir); err == nil {
 			if _, err := os.Stat(webDir); err == nil {
 				return dir, nil

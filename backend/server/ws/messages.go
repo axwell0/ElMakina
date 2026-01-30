@@ -53,6 +53,7 @@ const (
 	MsgKickVoteUpdate   = "kick_vote_update"
 	MsgPlayerKicked     = "player_kicked"
 	MsgChatMessage      = "chat_message"
+	MsgCardDiscarded    = "card_discarded"
 )
 
 type HelloPayload struct {
@@ -264,4 +265,14 @@ type KickVoteUpdatePayload struct {
 type PlayerKickedPayload struct {
 	PlayerIndex int    `json:"player_index"`
 	Reason      string `json:"reason"`
+}
+
+// CardDiscardedPayload notifies all players when a card is discarded
+type CardDiscardedPayload struct {
+	PlayerIndex   int    `json:"player_index"`
+	PlayerName    string `json:"player_name"`
+	CardRole      string `json:"card_role"`
+	Reason        string `json:"reason"`
+	Turn          int    `json:"turn"`
+	IsElimination bool   `json:"is_elimination"`
 }

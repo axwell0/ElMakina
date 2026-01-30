@@ -1,4 +1,4 @@
-.PHONY: install docker server dev-web build-web docs-generate gen-schema gen-all server dev-web dev
+.PHONY: install docker server dev-web build-web docs-generate gen-schema gen-types check-types gen-all server dev-web dev
 
 install:
 	go mod tidy
@@ -29,4 +29,11 @@ gen-schema:
 	go run ./backend/scripts/generate-schema/
 	bun run generate:ws-contract
 
-gen-all: gen-schema docs-generate
+gen-types:
+	cd backend && go run scripts/generate-types/main.go
+
+check-types:
+	cd backend && go run scripts/generate-types/main.go
+	git diff --exit-code web/src/types/generated.ts
+
+gen-all: gen-schema gen-types docs-generate

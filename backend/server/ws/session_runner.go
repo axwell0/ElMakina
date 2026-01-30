@@ -911,7 +911,40 @@ func (r *sessionRunner) broadcastLogs(turn int, res *engine.TurnResult) {
 			}
 		}
 	}
+	// Broadcast card discards for visual feedback
+	r.broadcastCardDiscards(turn, res)
 	r.broadcastHandState()
+}
+
+// broadcastCardDiscards sends structured card_discarded messages for each card lost in challenges
+func (r *sessionRunner) broadcastCardDiscards(turn int, res *engine.TurnResult) {
+	if res == nil || r.session == nil || r.session.Game == nil {
+		return
+	}
+	gs := &r.session.Game.CurrentState
+
+	// Process challenge results for discards
+	for _, cr := range res.ChallengeResults {
+		if cr.LostCard == nil || cr.LostPlayerIndex < 0 {
+			continue
+		}
+
+		player := gs.Players[cr.LostPlayerIndex]
+		reason := "challenge_lost"
+		isElimination := len(player.Hand) == 0
+
+		r.provider.broadcast(Envelope{
+			Type: MsgCardDiscarded,
+			Payload: mustJSON(CardDiscardedPayload{
+				PlayerIndex:   cr.LostPlayerIndex,
+				PlayerName:    player.Name,
+				CardRole:      string(cr.LostCard.Role),
+				Reason:        reason,
+				Turn:          turn,
+				IsElimination: isElimination,
+			}),
+		})
+	}
 }
 
 func (r *sessionRunner) broadcastGameOver(winner *state.Player) {
