@@ -107,8 +107,6 @@ export const ReplayGameView: React.FC<ReplayGameViewProps> = ({
 
     const hoverImage = hoverRole ? cardImageForRole(hoverRole) : null;
 
-    // @ts-ignore
-    // @ts-ignore
     return (
         <div className="relative flex min-h-[460px] w-full flex-col overflow-hidden rounded-[2rem] border-4 border-border bg-secondary/30 shadow-2xl sm:min-h-[520px] md:min-h-[600px]">
             <div className="absolute inset-0 pointer-events-none bg-sky-500/10 mix-blend-screen" />

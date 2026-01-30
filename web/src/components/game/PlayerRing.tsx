@@ -4,7 +4,7 @@ import {motion} from 'framer-motion';
 import {socket} from '@/network/socket';
 import {Coins, Target} from 'lucide-react';
 import {getPlayerPositions} from '@/lib/layout';
-import type {Action} from '@/store/gameReducer';
+import type {RootAction} from '@/state/slices';
 import type {GameIdentity, PlayerSnapshot, Prompt, TargetingState, TurnTimerState} from '@/store/types';
 
 
@@ -15,7 +15,7 @@ type PlayerRingProps = {
     targeting: TargetingState | null;
     pendingPrompt: Prompt | null;
     turnTimer: TurnTimerState | null;
-    dispatch: React.Dispatch<Action>;
+    dispatch: React.Dispatch<RootAction>;
     revealHands?: boolean;
     handsByIndex?: Record<number, string[]>;
     onActionSent?: (payload: { actionId: string; sourceIndex: number; targetIndex: number }) => void;
@@ -181,8 +181,15 @@ const PlayerRingBase: React.FC<PlayerRingProps> = ({
                                     if (targeting.actionId === "accuse") {
                                         dispatch({ type: "SET_TARGET_SELECTED", targetIndex: player.index });
                                     } else {
-                                        socket.send("action", { id: targeting.actionId, source_index: identity?.playerIndex, target_index: player.index }, targeting.requestId);
-                                        onActionSent?.({ actionId: targeting.actionId!, sourceIndex: identity?.playerIndex!, targetIndex: player.index });
+                                        const actionId = targeting.actionId;
+                                        const sourceIndex = identity?.playerIndex;
+                                        if (actionId == null || sourceIndex == null) return;
+                                        socket.send(
+                                            "action",
+                                            { id: actionId, source_index: sourceIndex, target_index: player.index },
+                                            targeting.requestId
+                                        );
+                                        onActionSent?.({ actionId, sourceIndex, targetIndex: player.index });
                                         dispatch({ type: "CLEAR_PROMPT" });
                                         dispatch({ type: "CLEAR_TARGETING" });
                                     }

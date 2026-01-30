@@ -28,6 +28,30 @@ type ReplayActionCue = {
     targetIndex?: number;
 };
 
+type ActionPayload = {
+    ID?: string;
+    id?: string;
+    SourceIndex?: number;
+    TargetIndex?: number;
+    Guess?: string;
+};
+
+type TurnResolvedPayload = {
+    main_action?: ActionPayload;
+    counter_results?: Array<{ Action?: ActionPayload }>;
+    turn_number?: number;
+    pass?: boolean;
+    player_index?: number;
+    action?: ActionPayload;
+};
+
+const toRecord = (value: unknown): Record<string, unknown> => {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+        return value as Record<string, unknown>;
+    }
+    return {};
+};
+
 const normalizeAvatar = (value?: string | null) => {
     if (!value) return '';
     return value.replace(/\s+/g, '');
@@ -99,7 +123,7 @@ const ACTION_ICONS: Record<string, React.ElementType> = {
     escape: Repeat,
 };
 
-const describeAction = (action: Record<string, any> | undefined, nameForIndex: (index?: number) => string) => {
+const describeAction = (action: ActionPayload | undefined, nameForIndex: (index?: number) => string) => {
     if (!action || typeof action !== 'object') return 'an action';
     const id = typeof action.ID === 'string' ? action.ID : typeof action.id === 'string' ? action.id : '';
     const label = id ? humanize(id) : 'an action';
@@ -138,9 +162,9 @@ const extractActionCue = (
     );
     const latest = candidates[candidates.length - 1];
     if (!latest) return null;
-    const payloadObj = (latest.Payload ?? {}) as Record<string, any>;
+    const payloadObj = toRecord(latest.Payload);
     if (latest.Type === 'turn_resolved') {
-        const main = payloadObj.main_action as Record<string, any> | undefined;
+        const main = (payloadObj as TurnResolvedPayload).main_action;
         const actionId = typeof main?.ID === 'string' ? main.ID : typeof main?.id === 'string' ? main.id : '';
         const role = actionId ? ROLE_BY_ACTION[actionId] : undefined;
         const sourceIndex = typeof main?.SourceIndex === 'number' ? main.SourceIndex : undefined;
@@ -148,10 +172,10 @@ const extractActionCue = (
         return { text: describeAction(main, nameForIndex), seq: latest.Seq, role, actionId: actionId || undefined, sourceIndex, targetIndex };
     }
     if (latest.Type === 'counter_response' && payloadObj.pass === true) {
-        const playerIndex = payloadObj.player_index as number | undefined;
+        const playerIndex = typeof payloadObj.player_index === 'number' ? payloadObj.player_index : undefined;
         return { text: `${nameForIndex(playerIndex)} passes on countering.`, seq: latest.Seq };
     }
-    const action = payloadObj.action as Record<string, any> | undefined;
+    const action = (payloadObj as TurnResolvedPayload).action;
     const actionId = typeof action?.ID === 'string' ? action.ID : typeof action?.id === 'string' ? action.id : '';
     const role = actionId ? ROLE_BY_ACTION[actionId] : undefined;
     const sourceIndex = typeof action?.SourceIndex === 'number' ? action.SourceIndex : undefined;
@@ -196,10 +220,10 @@ const buildTurnTimeline = (
         .filter((event) => event.Seq <= maxSeq)
         .forEach((event) => {
             if (event.Type !== 'turn_resolved') return;
-            const payloadObj = (event.Payload ?? {}) as Record<string, any>;
+            const payloadObj = toRecord(event.Payload) as TurnResolvedPayload;
             const turnNumber = typeof payloadObj.turn_number === 'number' ? payloadObj.turn_number : 1;
             const entry = getTurnEntry(turnNumber);
-            const main = payloadObj.main_action as Record<string, any> | undefined;
+            const main = payloadObj.main_action;
             if (main) {
                 const sourceIndex = typeof main.SourceIndex === 'number' ? main.SourceIndex : -1;
                 const actionId = typeof main.ID === 'string' ? main.ID : typeof main.id === 'string' ? main.id : '';
@@ -209,10 +233,10 @@ const buildTurnTimeline = (
                     actionId: actionId || undefined,
                 };
             }
-            const counterResults = payloadObj.counter_results as Array<Record<string, any>> | undefined;
+            const counterResults = payloadObj.counter_results;
             if (Array.isArray(counterResults)) {
                 counterResults.forEach((result) => {
-                    const action = result.Action as Record<string, any> | undefined;
+                    const action = result.Action;
                     if (!action) return;
                     const sourceIndex = typeof action.SourceIndex === 'number' ? action.SourceIndex : -1;
                     const actionId = typeof action.ID === 'string' ? action.ID : typeof action.id === 'string' ? action.id : '';
