@@ -1,8 +1,52 @@
 import type {GameState} from '@/state/types';
+import type {SlicedGameState} from '@/state/slices';
 
 const now = Date.now();
 
 export type MockScenario = 'game' | 'lobby' | 'reveal' | 'gameover' | 'paused' | 'assassinate' | 'showcase';
+
+// Helper to convert flat GameState to sliced state
+function toSlicedState(flat: GameState): SlicedGameState {
+    return {
+        connection: {
+            isConnected: flat.isConnected,
+            isHandshakeComplete: flat.isHandshakeComplete,
+            playerId: flat.playerId,
+            error: flat.error,
+            connectionLostAt: flat.connectionLostAt,
+        },
+        lobby: {
+            lobbies: flat.lobbies,
+            currentLobby: flat.currentLobby,
+        },
+        game: {
+            currentMatch: flat.currentMatch,
+            identity: flat.identity,
+            players: flat.players,
+            roles: flat.roles,
+            hand: flat.hand,
+            activePlayerIndex: flat.activePlayerIndex,
+            pendingPrompt: flat.pendingPrompt,
+            promptClosedReason: flat.promptClosedReason,
+            targeting: flat.targeting,
+            turnTimer: flat.turnTimer,
+            pause: flat.pause,
+            gameOver: flat.gameOver,
+        },
+        ui: {
+            sfxMuted: flat.sfxMuted,
+            theme: flat.theme,
+            logs: flat.logs,
+            chat: flat.chat,
+            investigateResult: flat.investigateResult,
+            eliminationToast: flat.eliminationToast,
+            turnTimer: flat.turnTimer,
+            replayHistory: flat.replayHistory,
+            lastUpdateTs: flat.lastUpdateTs,
+            mockScenario: flat.mockScenario,
+        },
+    };
+}
 
 const baseGameState: GameState = {
     isConnected: true,
@@ -151,7 +195,7 @@ const pausedState: GameState = {
     ...baseGameState,
     mockScenario: 'paused',
     pause: {
-        status: "active",
+        status: "paused",
         pausedByPlayerId: "mock-2",
         pausedByIndex: 2,
         pausedByName: "Yara",
@@ -199,22 +243,22 @@ const showcaseState: GameState = {
     },
 };
 
-export const getMockState = (scenario: MockScenario): GameState => {
+export const getMockState = (scenario: MockScenario): SlicedGameState => {
     switch (scenario) {
         case 'lobby':
-            return { ...lobbyState, mockScenario: 'lobby' };
+            return toSlicedState({ ...lobbyState, mockScenario: 'lobby' });
         case 'reveal':
-            return { ...revealState, mockScenario: 'reveal' };
+            return toSlicedState({ ...revealState, mockScenario: 'reveal' });
         case 'gameover':
-            return { ...gameOverState, mockScenario: 'gameover' };
+            return toSlicedState({ ...gameOverState, mockScenario: 'gameover' });
         case 'paused':
-            return pausedState;
+            return toSlicedState(pausedState);
         case 'assassinate':
-            return assassinateState;
+            return toSlicedState(assassinateState);
         case 'showcase':
-            return showcaseState;
+            return toSlicedState(showcaseState);
         case 'game':
         default:
-            return { ...baseGameState, mockScenario: scenario };
+            return toSlicedState({ ...baseGameState, mockScenario: scenario });
     }
 };
