@@ -156,25 +156,26 @@ func buildLobbyServer(cfg config) (*ws.Server, replay.Recorder, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	if err := manager.ResetInGameLobbiesToOpen(); err != nil {
+	ctx := context.Background()
+	if err := manager.ResetInGameLobbiesToOpen(ctx); err != nil {
 		return nil, nil, err
 	}
 	// Drop any open lobbies restored from disk that have no online members.
-	if _, err := manager.PruneEmptyOpenLobbies(map[string]struct{}{}); err != nil {
+	if _, err := manager.PruneEmptyOpenLobbies(ctx, map[string]struct{}{}); err != nil {
 		return nil, nil, err
 	}
-	server := ws.NewServer(manager, engine.RealClock{}, buildTurnConfig(cfg), cfg.Grace)
+	server := ws.NewServer(manager, engine.RealClock{}, buildTurnConfig(cfg), cfg.Grace, cfg.CORSOrigins)
 	var recorder replay.Recorder
 	if cfg.PostgresDSN == "" {
 		return nil, nil, fmt.Errorf("%s is required", envPostgresDSN)
 	}
-	db, err := replay.OpenPostgres(context.Background(), cfg.PostgresDSN)
+	db, err := replay.OpenPostgres(ctx, cfg.PostgresDSN)
 	if err != nil {
 		return nil, nil, err
 	}
 	store := replay.NewStore(db)
 	if cfg.ReplayAutoMigrate {
-		if err := store.AutoMigrate(context.Background()); err != nil {
+		if err := store.AutoMigrate(ctx); err != nil {
 			return nil, nil, err
 		}
 	}
