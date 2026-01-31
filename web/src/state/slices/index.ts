@@ -111,6 +111,7 @@ export type RootAction =
   | { type: "CLEAR_PROMPT" }
   | { type: "CLEAR_INVESTIGATE" }
   | { type: "CLEAR_ELIMINATION_TOAST" }
+  | { type: "DISMISS_DISCARD" }
   | { type: "RESET" };
 
 // Root reducer that delegates to slice reducers
@@ -664,6 +665,12 @@ export function rootReducer(
       return {
         ...state,
         ui: uiReducer(state.ui, uiActions.clearEliminationToast()),
+      };
+
+    case "DISMISS_DISCARD":
+      return {
+        ...state,
+        game: gameReducer(state.game, gameActions.dismissDiscard()),
       };
 
     case "RESET":

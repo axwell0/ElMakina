@@ -32,6 +32,9 @@ function toSlicedState(flat: GameState): SlicedGameState {
             turnTimer: flat.turnTimer,
             pause: flat.pause,
             gameOver: flat.gameOver,
+            discardQueue: flat.discardQueue,
+            currentDiscard: flat.currentDiscard,
+            eliminatingPlayer: flat.eliminatingPlayer,
         },
         ui: {
             sfxMuted: flat.sfxMuted,
@@ -143,6 +146,9 @@ const baseGameState: GameState = {
     connectionLostAt: null,
     lastUpdateTs: now,
     mockScenario: 'game',
+    discardQueue: [],
+    currentDiscard: null,
+    eliminatingPlayer: null,
 };
 
 const lobbyState: GameState = {

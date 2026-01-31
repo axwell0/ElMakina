@@ -35,6 +35,7 @@ export type ElMakinaWebSocketEnvelope =
   | InvestigateResult
   | HandState
   | PlayerEliminated
+  | CardDiscarded
   | TurnTimer
   | GamePaused
   | GameResumed
@@ -192,6 +193,11 @@ export type HandState = EnvelopeBase & {
 export type PlayerEliminated = EnvelopeBase & {
   payload: PlayerEliminatedPayload;
   type: 'player_eliminated';
+  [k: string]: unknown;
+};
+export type CardDiscarded = EnvelopeBase & {
+  payload: CardDiscardedPayload;
+  type: 'card_discarded';
   [k: string]: unknown;
 };
 export type TurnTimer = EnvelopeBase & {
@@ -377,6 +383,14 @@ export interface PlayerEliminatedPayload {
   player_index: number;
   reason: string;
   turn: number;
+}
+export interface CardDiscardedPayload {
+  player_index: number;
+  player_name: string;
+  card_role: string;
+  reason: string;
+  turn: number;
+  is_elimination: boolean;
 }
 export interface TurnTimerPayload {
   active_player_index: number;

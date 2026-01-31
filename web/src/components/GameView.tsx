@@ -464,7 +464,7 @@ export const GameView: React.FC = () => {
             <HandTray
                 hand={state.hand}
                 isActive={state.activePlayerIndex === state.identity?.playerIndex}
-                onHoverStart={(role) => {
+                onHoverStart={() => {
                     if (state.activePlayerIndex === state.identity?.playerIndex) {
                         // Optional: highlight relevant actions
                     }
@@ -477,7 +477,7 @@ export const GameView: React.FC = () => {
 
             <PhaseOverlay />
             <GamePausedOverlay />
-            {showReconnecting && state.pause.status !== "active" && (
+            {showReconnecting && state.pause.status !== "paused" && (
                 <div className="absolute inset-0 z-[1900] flex items-center justify-center px-3 sm:px-4">
                     <div className="absolute inset-0 bg-background/70 backdrop-blur-sm" />
                     <div className="relative rounded-2xl border border-border bg-card/90 px-4 sm:px-6 py-3 sm:py-4 shadow-xl">
