@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -8,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"ElMakina/backend/domain/entities"
 	"ElMakina/backend/engine"
 	"ElMakina/backend/server"
 	"ElMakina/backend/server/replay"
@@ -27,14 +29,15 @@ import (
 //   - Each connection is bound to one player.
 //   - Disconnects forfeit the player and abort the current turn.
 type Server struct {
-	upgrader gws.Upgrader
-	manager  *server.LobbyManager
-	clock    engine.Clock
-	cfg      engine.TurnConfig
-	start    func(*sessionRunner)
-	grace    time.Duration
-	forfeit  *ForfeitScheduler
-	recorder replay.Recorder
+	upgrader       gws.Upgrader
+	manager        *server.LobbyManager
+	clock          engine.Clock
+	cfg            engine.TurnConfig
+	start          func(*sessionRunner)
+	grace          time.Duration
+	forfeit        *ForfeitScheduler
+	recorder       replay.Recorder
+	allowedOrigins map[string]struct{}
 
 	mu       sync.Mutex
 	clients  map[string]*clientConn
@@ -48,34 +51,49 @@ type wsConn interface {
 }
 
 type clientConn struct {
-	player      *server.Player
-	conn        wsConn
-	sendMu      sync.Mutex
-	lobbyID     string
-	session     *sessionRunner
-	playerIndex int
+	playerID     entities.PlayerID
+	playerNick   string
+	playerAvatar string
+	conn         wsConn
+	sendMu       sync.Mutex
+	lobbyID      entities.LobbyID
+	session      *sessionRunner
+	playerIndex  int
 }
 
-// NewServer constructs a lobby server.
-func NewServer(manager *server.LobbyManager, clock engine.Clock, cfg engine.TurnConfig, grace time.Duration) *Server {
+// NewServer constructs a lobby server with the given allowed origins.
+// If allowedOrigins is empty, all origins are permitted (development mode).
+func NewServer(manager *server.LobbyManager, clock engine.Clock, cfg engine.TurnConfig, grace time.Duration, allowedOrigins []string) *Server {
 	if manager == nil {
-		manager = server.NewLobbyManager(2, 9)
+		panic("LobbyManager is required")
 	}
 	if clock == nil {
 		clock = engine.RealClock{}
 	}
+	originSet := make(map[string]struct{}, len(allowedOrigins))
+	for _, o := range allowedOrigins {
+		originSet[o] = struct{}{}
+	}
 	return &Server{
 		upgrader: gws.Upgrader{
-			CheckOrigin: func(r *http.Request) bool { return true },
+			CheckOrigin: func(r *http.Request) bool {
+				if len(originSet) == 0 {
+					return true
+				}
+				origin := r.Header.Get("Origin")
+				_, ok := originSet[origin]
+				return ok
+			},
 		},
-		manager:  manager,
-		clock:    clock,
-		cfg:      cfg,
-		grace:    grace,
-		start:    func(r *sessionRunner) { r.Start() },
-		clients:  make(map[string]*clientConn),
-		sessions: make(map[string]*sessionRunner),
-		forfeit:  NewForfeitScheduler(clock, grace),
+		manager:        manager,
+		clock:          clock,
+		cfg:            cfg,
+		grace:          grace,
+		start:          func(r *sessionRunner) { r.Start() },
+		clients:        make(map[string]*clientConn),
+		sessions:       make(map[string]*sessionRunner),
+		forfeit:        NewForfeitScheduler(clock, grace),
+		allowedOrigins: originSet,
 	}
 }
 
@@ -86,6 +104,7 @@ func (s *Server) SetRecorder(recorder replay.Recorder) {
 
 // ServeHTTP upgrades to WebSocket and starts the lobby/game loop for a client.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	conn, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Printf("ws upgrade failed: %v", err)
@@ -113,9 +132,9 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		_ = conn.Close()
 		return
 	}
-	var player *server.Player
+	var player *entities.Player
 	if payload.ReconnectToken != "" {
-		player, err = s.manager.ReconnectPlayer(payload.ReconnectToken)
+		player, err = s.manager.ReconnectPlayer(ctx, payload.ReconnectToken)
 		if err != nil {
 			log.Printf("reconnect failed: %v", err)
 			_ = s.sendRaw(conn, Envelope{
@@ -126,7 +145,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	} else {
-		player, err = s.manager.RegisterPlayer(payload.Nickname)
+		player, err = s.manager.RegisterPlayer(ctx, payload.Nickname)
 		if err != nil {
 			log.Printf("register failed: %v", err)
 			_ = s.sendRaw(conn, Envelope{
@@ -138,27 +157,29 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if payload.Avatar != "" {
-		if err := s.manager.SetPlayerAvatar(player.ID, payload.Avatar); err == nil {
-			player.Avatar = payload.Avatar
+		if err := s.manager.SetPlayerAvatar(ctx, player.ID(), payload.Avatar); err == nil {
+			player.SetAvatar(payload.Avatar)
 		}
 	}
 
 	client := &clientConn{
-		player: player,
-		conn:   conn,
+		playerID:     player.ID(),
+		playerNick:   player.Nick(),
+		playerAvatar: player.Avatar(),
+		conn:         conn,
 	}
-	log.Printf("client connected: %s (%s)", player.Nick, player.ID)
+	log.Printf("client connected: %s (%s)", player.Nick(), player.ID())
 	s.registerClient(client)
 	_ = s.send(client, Envelope{
 		Type:    MsgHelloAck,
-		Payload: mustJSON(HelloAckPayload{PlayerID: player.ID, Token: player.Token}),
+		Payload: mustJSON(HelloAckPayload{PlayerID: player.ID().String(), Token: player.Token()}),
 	})
 	_ = s.send(client, Envelope{
 		Type:    MsgGameConfig,
 		Payload: mustJSON(buildGameConfigPayload()),
 	})
-	s.broadcastLobbyList()
-	s.forfeit.Cancel(player.ID)
+	s.broadcastLobbyList(ctx)
+	s.forfeit.Cancel(player.ID().String())
 	s.reattachToLobby(client)
 	go s.readLoop(client)
 }
@@ -166,8 +187,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (s *Server) registerClient(client *clientConn) {
 	var prior *clientConn
 	s.mu.Lock()
-	prior = s.clients[client.player.ID]
-	s.clients[client.player.ID] = client
+	prior = s.clients[client.playerID.String()]
+	s.clients[client.playerID.String()] = client
 	s.mu.Unlock()
 	if prior != nil && prior != client {
 		_ = prior.conn.Close()
@@ -175,34 +196,37 @@ func (s *Server) registerClient(client *clientConn) {
 }
 
 func (s *Server) unregisterClient(client *clientConn, err error) {
+	ctx := context.Background()
 	s.mu.Lock()
-	current := s.clients[client.player.ID]
+	current := s.clients[client.playerID.String()]
 	if current != nil && current != client {
 		s.mu.Unlock()
 		return
 	}
-	delete(s.clients, client.player.ID)
+	delete(s.clients, client.playerID.String())
 	s.mu.Unlock()
 
 	if client.session != nil {
 		client.session.provider.detach(client.playerIndex, client)
-		client.session.EnqueueOffline(client.player.ID)
-		s.forfeit.Schedule(client.player.ID, func() { client.session.Forfeit(client.player.ID) })
+		client.session.EnqueueOffline(client.playerID.String())
+		s.forfeit.Schedule(client.playerID.String(), func() { client.session.Forfeit(client.playerID.String()) })
 		return
 	}
 	if client.lobbyID != "" {
-		_ = s.manager.RemovePlayer(client.lobbyID, client.player.ID)
-		s.broadcastLobbyState(client.lobbyID)
-		s.broadcastLobbyList()
-		log.Printf("client left lobby: %s (%s)", client.player.Nick, client.player.ID)
+		shouldClose, _ := s.manager.LeaveLobby(ctx, client.lobbyID, client.playerID)
+		_ = shouldClose
+		s.broadcastLobbyState(ctx, client.lobbyID.String())
+		s.broadcastLobbyList(ctx)
+		log.Printf("client left lobby: %s (%s)", client.playerNick, client.playerID)
 		return
 	}
 	// Keep player registration to preserve reconnect token across restarts.
-	log.Printf("client disconnected: %s (%s)", client.player.Nick, client.player.ID)
-	s.broadcastLobbyList()
+	log.Printf("client disconnected: %s (%s)", client.playerNick, client.playerID)
+	s.broadcastLobbyList(ctx)
 }
 
 func (s *Server) readLoop(client *clientConn) {
+	ctx := context.Background()
 	for {
 		var env Envelope
 		if err := client.conn.ReadJSON(&env); err != nil {
@@ -214,42 +238,42 @@ func (s *Server) readLoop(client *clientConn) {
 			client.session.EnqueueClientEnvelope(client.playerIndex, env)
 			continue
 		}
-		if err := s.handleLobbyMessage(client, env); err != nil {
+		if err := s.handleLobbyMessage(ctx, client, env); err != nil {
 			_ = s.send(client, Envelope{Type: MsgLobbyError, RequestID: env.RequestID, Payload: mustJSON(map[string]string{"error": err.Error()})})
 		}
 	}
 }
 
-func (s *Server) handleLobbyMessage(client *clientConn, env Envelope) error {
+func (s *Server) handleLobbyMessage(ctx context.Context, client *clientConn, env Envelope) error {
 	switch env.Type {
 	case MsgLobbyCreate:
-		lobby, err := s.manager.CreateLobby(client.player.ID)
+		lobby, err := s.manager.CreateLobby(ctx, client.playerID)
 		if err != nil {
 			return err
 		}
-		client.lobbyID = lobby.ID
+		client.lobbyID = lobby.ID()
 		if err := s.send(client, Envelope{
 			Type:      MsgLobbyCreated,
 			RequestID: env.RequestID,
-			Payload:   mustJSON(LobbyCreatedPayload{LobbyID: lobby.ID}),
+			Payload:   mustJSON(LobbyCreatedPayload{LobbyID: lobby.ID().String()}),
 		}); err != nil {
 			return err
 		}
-		s.broadcastLobbyState(lobby.ID)
-		s.broadcastLobbyList()
+		s.broadcastLobbyState(ctx, lobby.ID().String())
+		s.broadcastLobbyList(ctx)
 		return nil
 	case MsgLobbyList:
-		lobbies := s.manager.ListLobbies()
+		lobbies, err := s.manager.ListLobbies(ctx)
+		if err != nil {
+			return err
+		}
 		items := make([]LobbySummaryPayload, 0, len(lobbies))
 		for _, lobby := range lobbies {
 			items = append(items, LobbySummaryPayload{
-				ID:          lobby.ID,
-				LeaderNick:  lobby.LeaderNick,
-				LeaderID:    lobby.LeaderID,
-				PlayerCount: lobby.PlayerCount,
-				PlayerNicks: lobby.PlayerNicks,
-				PlayerIDs:   lobby.PlayerIDs,
-				Status:      string(lobby.Status),
+				ID:          lobby.ID().String(),
+				LeaderID:    lobby.LeaderID().String(),
+				PlayerCount: lobby.PlayerCount(),
+				Status:      string(lobby.Status()),
 			})
 		}
 		return s.send(client, Envelope{
@@ -262,10 +286,11 @@ func (s *Server) handleLobbyMessage(client *clientConn, env Envelope) error {
 		if err := json.Unmarshal(env.Payload, &payload); err != nil {
 			return err
 		}
-		if err := s.manager.JoinLobby(payload.LobbyID, client.player.ID); err != nil {
+		lobbyID := entities.LobbyID(payload.LobbyID)
+		if err := s.manager.JoinLobby(ctx, lobbyID, client.playerID); err != nil {
 			return err
 		}
-		client.lobbyID = payload.LobbyID
+		client.lobbyID = lobbyID
 		if err := s.send(client, Envelope{
 			Type:      MsgLobbyJoined,
 			RequestID: env.RequestID,
@@ -273,23 +298,20 @@ func (s *Server) handleLobbyMessage(client *clientConn, env Envelope) error {
 		}); err != nil {
 			return err
 		}
-		s.broadcastLobbyState(payload.LobbyID)
-		s.broadcastLobbyList()
+		s.broadcastLobbyState(ctx, payload.LobbyID)
+		s.broadcastLobbyList(ctx)
 		return nil
 	case MsgLobbyStart:
 		var payload LobbyStartPayload
 		if err := json.Unmarshal(env.Payload, &payload); err != nil {
 			return err
 		}
-		session, err := s.manager.StartLobby(payload.LobbyID, client.player.ID)
-		if err != nil {
+		lobbyID := entities.LobbyID(payload.LobbyID)
+		if err := s.manager.StartLobby(ctx, lobbyID, client.playerID); err != nil {
 			return err
 		}
-		runner := newSessionRunner(session, s.clock, s.cfg, s.grace, s.recorder)
-		s.attachSession(session, runner)
-		s.start(runner)
-		s.broadcastLobbyState(payload.LobbyID)
-		s.broadcastLobbyList()
+		s.broadcastLobbyState(ctx, payload.LobbyID)
+		s.broadcastLobbyList(ctx)
 		return nil
 	case MsgHello:
 		// Ignore late hello messages after handshake.
@@ -300,17 +322,19 @@ func (s *Server) handleLobbyMessage(client *clientConn, env Envelope) error {
 }
 
 func (s *Server) attachSession(session *server.GameSession, runner *sessionRunner) {
+	ctx := context.Background()
 	playerNames := make([]string, 0, len(session.PlayerIDs))
 	playerAvatars := make([]string, 0, len(session.PlayerIDs))
 	for _, id := range session.PlayerIDs {
-		player, err := s.manager.GetPlayer(id)
+		playerID := entities.PlayerID(id)
+		player, err := s.manager.GetPlayerByID(ctx, playerID)
 		if err != nil || player == nil {
 			playerNames = append(playerNames, "")
 			playerAvatars = append(playerAvatars, "")
 			continue
 		}
-		playerNames = append(playerNames, player.Nick)
-		playerAvatars = append(playerAvatars, player.Avatar)
+		playerNames = append(playerNames, player.Nick())
+		playerAvatars = append(playerAvatars, player.Avatar())
 	}
 
 	type clientInfo struct {
@@ -370,39 +394,46 @@ func (s *Server) sendRaw(conn wsConn, env Envelope) error {
 
 // reattachToLobby rebinds a reconnecting client to any existing lobby/session.
 func (s *Server) reattachToLobby(client *clientConn) {
-	lobbyID, ok := s.manager.FindLobbyByPlayer(client.player.ID)
-	if !ok {
+	ctx := context.Background()
+	lobby, err := s.manager.GetLobbyByPlayerID(ctx, client.playerID)
+	if err != nil {
 		return
 	}
+	lobbyID := lobby.ID()
 	client.lobbyID = lobbyID
-	session := s.sessions[lobbyID]
+	session := s.sessions[lobbyID.String()]
 	if session == nil {
-		if err := s.manager.ResetLobbyToOpen(lobbyID); err != nil {
+		// Reset lobby to open if no session exists
+		lobby.ResetToOpen()
+		_, err := s.manager.LeaveLobby(ctx, lobbyID, client.playerID)
+		if err != nil {
 			log.Printf("failed to reset lobby %s: %v", lobbyID, err)
 		}
-		s.broadcastLobbyState(lobbyID)
+		s.broadcastLobbyState(ctx, lobbyID.String())
 		return
 	}
 	if session.session == nil {
 		log.Printf("session has no game state for lobby %s", lobbyID)
-		if err := s.manager.ResetLobbyToOpen(lobbyID); err != nil {
+		lobby.ResetToOpen()
+		_, err := s.manager.LeaveLobby(ctx, lobbyID, client.playerID)
+		if err != nil {
 			log.Printf("failed to reset lobby %s: %v", lobbyID, err)
 		}
-		s.broadcastLobbyState(lobbyID)
+		s.broadcastLobbyState(ctx, lobbyID.String())
 		return
 	}
-	index, ok := session.session.IndexByPlayer[client.player.ID]
+	index, ok := session.session.IndexByPlayer[client.playerID.String()]
 	if !ok {
-		log.Printf("player %s not found in session for lobby %s", client.player.ID, lobbyID)
+		log.Printf("player %s not found in session for lobby %s", client.playerID, lobbyID)
 		return
 	}
 	client.session = session
 	client.playerIndex = index
 	session.provider.attach(index, client)
-	if index >= 0 && index < len(session.session.PlayerAvatars) && client.player.Avatar != "" {
-		session.session.PlayerAvatars[index] = client.player.Avatar
+	if index >= 0 && index < len(session.session.PlayerAvatars) && client.playerAvatar != "" {
+		session.session.PlayerAvatars[index] = client.playerAvatar
 	}
-	session.EnqueueOnline(client.player.ID)
+	session.EnqueueOnline(client.playerID.String())
 	_ = s.send(client, Envelope{
 		Type: MsgHandState,
 		Payload: mustJSON(HandStatePayload{
@@ -430,50 +461,51 @@ func (s *Server) reattachToLobby(client *clientConn) {
 }
 
 // broadcastLobbyState emits the latest lobby state to all players in the lobby.
-func (s *Server) broadcastLobbyState(lobbyID string) {
-	lobby, err := s.manager.GetLobby(lobbyID)
+func (s *Server) broadcastLobbyState(ctx context.Context, lobbyID string) {
+	lobby, err := s.manager.GetLobby(ctx, entities.LobbyID(lobbyID))
 	if err != nil {
 		log.Printf("broadcastLobbyState: failed to get lobby %s: %v", lobbyID, err)
 		return
 	}
-	playerNicks := make([]string, 0, len(lobby.PlayerIDs))
-	playerIDs := make([]string, 0, len(lobby.PlayerIDs))
-	playerAvatars := make([]string, 0, len(lobby.PlayerIDs))
-	for _, id := range lobby.PlayerIDs {
-		player, err := s.manager.GetPlayer(id)
+	playerIDs := lobby.PlayerIDs()
+	playerNicks := make([]string, 0, len(playerIDs))
+	playerIDStrs := make([]string, 0, len(playerIDs))
+	playerAvatars := make([]string, 0, len(playerIDs))
+	for _, id := range playerIDs {
+		player, err := s.manager.GetPlayerByID(ctx, id)
 		if err != nil {
 			log.Printf("broadcastLobbyState: failed to get player %s: %v", id, err)
 			continue
 		}
-		playerNicks = append(playerNicks, player.Nick)
-		playerIDs = append(playerIDs, player.ID)
-		playerAvatars = append(playerAvatars, player.Avatar)
+		playerNicks = append(playerNicks, player.Nick())
+		playerIDStrs = append(playerIDStrs, player.ID().String())
+		playerAvatars = append(playerAvatars, player.Avatar())
 	}
-	leader, err := s.manager.GetPlayer(lobby.LeaderID)
+	leader, err := s.manager.GetPlayerByID(ctx, lobby.LeaderID())
 	if err != nil {
-		log.Printf("broadcastLobbyState: failed to get leader %s: %v", lobby.LeaderID, err)
+		log.Printf("broadcastLobbyState: failed to get leader %s: %v", lobby.LeaderID(), err)
 	}
 	leaderNick := ""
 	if leader != nil {
-		leaderNick = leader.Nick
+		leaderNick = leader.Nick()
 	}
 
 	payload := mustJSON(LobbyStatePayload{
-		LobbyID:       lobby.ID,
+		LobbyID:       lobby.ID().String(),
 		LeaderNick:    leaderNick,
-		LeaderID:      lobby.LeaderID,
+		LeaderID:      lobby.LeaderID().String(),
 		PlayerNicks:   playerNicks,
-		PlayerIDs:     playerIDs,
+		PlayerIDs:     playerIDStrs,
 		PlayerAvatars: playerAvatars,
-		PlayerCount:   len(lobby.PlayerIDs),
-		Status:        string(lobby.Status),
+		PlayerCount:   len(playerIDs),
+		Status:        string(lobby.Status()),
 	})
 
 	// Collect clients while locked
-	clientsToNotify := make([]*clientConn, 0, len(lobby.PlayerIDs))
+	clientsToNotify := make([]*clientConn, 0, len(playerIDs))
 	s.mu.Lock()
-	for _, id := range lobby.PlayerIDs {
-		if client := s.clients[id]; client != nil {
+	for _, id := range playerIDs {
+		if client := s.clients[id.String()]; client != nil {
 			clientsToNotify = append(clientsToNotify, client)
 		}
 	}
@@ -485,7 +517,7 @@ func (s *Server) broadcastLobbyState(lobbyID string) {
 	}
 }
 
-func (s *Server) broadcastLobbyList() {
+func (s *Server) broadcastLobbyList(ctx context.Context) {
 	s.mu.Lock()
 	online := make(map[string]struct{}, len(s.clients))
 	for id := range s.clients {
@@ -493,32 +525,49 @@ func (s *Server) broadcastLobbyList() {
 	}
 	s.mu.Unlock()
 
-	if _, err := s.manager.PruneEmptyOpenLobbies(online); err != nil {
+	// Prune empty lobbies older than 1 hour
+	if _, err := s.manager.PruneEmptyLobbies(ctx, 1*time.Hour); err != nil {
 		log.Printf("broadcastLobbyList: failed to prune lobbies: %v", err)
 	}
 
-	lobbies := s.manager.ListLobbies()
+	lobbies, err := s.manager.ListLobbies(ctx)
+	if err != nil {
+		log.Printf("broadcastLobbyList: failed to list lobbies: %v", err)
+		return
+	}
 	items := make([]LobbySummaryPayload, 0, len(lobbies))
 	for _, lobby := range lobbies {
-		avatars := make([]string, 0, len(lobby.PlayerIDs))
-		for _, id := range lobby.PlayerIDs {
-			player, err := s.manager.GetPlayer(id)
+		playerIDs := lobby.PlayerIDs()
+		avatars := make([]string, 0, len(playerIDs))
+		playerNicks := make([]string, 0, len(playerIDs))
+		playerIDStrs := make([]string, 0, len(playerIDs))
+		for _, id := range playerIDs {
+			player, err := s.manager.GetPlayerByID(ctx, id)
 			if err != nil {
 				log.Printf("broadcastLobbyList: failed to get player %s: %v", id, err)
 				avatars = append(avatars, "")
+				playerNicks = append(playerNicks, "")
+				playerIDStrs = append(playerIDStrs, id.String())
 				continue
 			}
-			avatars = append(avatars, player.Avatar)
+			avatars = append(avatars, player.Avatar())
+			playerNicks = append(playerNicks, player.Nick())
+			playerIDStrs = append(playerIDStrs, player.ID().String())
+		}
+		leader, _ := s.manager.GetPlayerByID(ctx, lobby.LeaderID())
+		leaderNick := ""
+		if leader != nil {
+			leaderNick = leader.Nick()
 		}
 		items = append(items, LobbySummaryPayload{
-			ID:            lobby.ID,
-			LeaderNick:    lobby.LeaderNick,
-			LeaderID:      lobby.LeaderID,
-			PlayerCount:   lobby.PlayerCount,
-			PlayerNicks:   lobby.PlayerNicks,
-			PlayerIDs:     lobby.PlayerIDs,
+			ID:            lobby.ID().String(),
+			LeaderNick:    leaderNick,
+			LeaderID:      lobby.LeaderID().String(),
+			PlayerCount:   lobby.PlayerCount(),
+			PlayerNicks:   playerNicks,
+			PlayerIDs:     playerIDStrs,
 			PlayerAvatars: avatars,
-			Status:        string(lobby.Status),
+			Status:        string(lobby.Status()),
 		})
 	}
 	payload := mustJSON(LobbyListPayload{Lobbies: items})
