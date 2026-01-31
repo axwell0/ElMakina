@@ -5,7 +5,7 @@ import '@testing-library/jest-dom';
 import { vi, afterEach } from 'vitest';
 
 // Mock WebSocket for tests
-global.WebSocket = class MockWebSocket {
+class MockWebSocket {
   static CONNECTING = 0;
   static OPEN = 1;
   static CLOSING = 2;
@@ -17,21 +17,27 @@ global.WebSocket = class MockWebSocket {
   onclose: ((this: WebSocket, ev: CloseEvent) => unknown) | null = null;
   onerror: ((this: WebSocket, ev: Event) => unknown) | null = null;
 
+  // Use vi.fn() for methods that tests need to spy on
+  send = vi.fn((data: string | ArrayBufferLike | Blob | ArrayBufferView): void => {
+    void data;
+  });
+
+  close = vi.fn((code?: number, reason?: string): void => {
+    void code;
+    void reason;
+  });
+
   constructor(
     public url: string | URL,
     protocols?: string | string[]
   ) {
     void protocols;
   }
+}
 
-  send(data: string | ArrayBufferLike | Blob | ArrayBufferView): void {
-    void data;
-  }
-  close(code?: number, reason?: string): void {
-    void code;
-    void reason;
-  }
-} as unknown as typeof WebSocket;
+
+
+global.WebSocket = MockWebSocket as unknown as typeof WebSocket;
 
 // Mock localStorage for tests
 const localStorageMock = {
