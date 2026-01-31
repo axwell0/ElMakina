@@ -219,22 +219,23 @@ func extractPlayerNames(session *server.GameSession) []string {
 // See: orchestrator_turn.go:29 for the engine turn flow.
 // See: session_provider.go for InputProvider implementation.
 type sessionRunner struct {
-	session  *server.GameSession // The game state and player mappings
-	provider *sessionProvider    // Bridges WebSocket messages to InputProvider interface
-	clock    engine.Clock        // Time source (real or fake for testing)
-	pause    *pausableClock      // Wrapper that can pause turn timers
-	cfg      engine.TurnConfig   // Timeout durations
-	grace    time.Duration       // Reconnection grace period
-	errCh    chan error          // Fatal errors (disconnects, etc.)
-	ctx      context.Context     // Session lifecycle context
-	cancel   context.CancelFunc  // Call to end the session
-	wg       sync.WaitGroup      // Waits for goroutines to finish
-	cmdCh    chan sessionCommand // Serialized command queue
-	mu       sync.Mutex          // Protects offline/kicked/paused maps
-	offline  map[string]struct{} // Set of disconnected player IDs
-	kicked   map[string]struct{} // Set of kicked player IDs
-	paused   *pauseState         // Pause state (who paused, when)
-	events   *eventRecorder      // Replay recording
+	session    *server.GameSession  // The game state and player mappings
+	provider   *sessionProvider     // Bridges WebSocket messages to InputProvider interface
+	clock      engine.Clock         // Time source (real or fake for testing)
+	pause      *pausableClock       // Wrapper that can pause turn timers
+	cfg        engine.TurnConfig    // Timeout durations
+	grace      time.Duration        // Reconnection grace period
+	errCh      chan error           // Fatal errors (disconnects, etc.)
+	ctx        context.Context      // Session lifecycle context
+	cancel     context.CancelFunc   // Call to end the session
+	wg         sync.WaitGroup       // Waits for goroutines to finish
+	cmdCh      chan sessionCommand  // Serialized command queue
+	mu         sync.Mutex           // Protects offline/kicked/paused maps
+	offline    map[string]struct{}  // Set of disconnected player IDs
+	kicked     map[string]struct{}  // Set of kicked player IDs
+	paused     *pauseState          // Pause state (who paused, when)
+	events     *eventRecorder       // Replay recording
+	onComplete func(lobbyID string) // Callback when session ends
 }
 
 // sessionCommand is a message sent to the session's command queue.
@@ -358,6 +359,9 @@ func (r *sessionRunner) run() {
 	defer func() {
 		if r.cancel != nil {
 			r.cancel()
+		}
+		if r.onComplete != nil && r.session != nil {
+			r.onComplete(r.session.LobbyID)
 		}
 	}()
 	for {

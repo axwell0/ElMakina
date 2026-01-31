@@ -323,6 +323,14 @@ func (s *Server) handleLobbyMessage(ctx context.Context, client *clientConn, env
 
 func (s *Server) attachSession(session *server.GameSession, runner *sessionRunner) {
 	ctx := context.Background()
+
+	// Set up cleanup callback to remove session when game ends
+	runner.onComplete = func(lobbyID string) {
+		s.mu.Lock()
+		delete(s.sessions, lobbyID)
+		s.mu.Unlock()
+	}
+
 	playerNames := make([]string, 0, len(session.PlayerIDs))
 	playerAvatars := make([]string, 0, len(session.PlayerIDs))
 	for _, id := range session.PlayerIDs {
