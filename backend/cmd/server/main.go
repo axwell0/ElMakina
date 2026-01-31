@@ -15,8 +15,7 @@ import (
 )
 
 func main() {
-	rand.New(rand.NewSource(time.Now().UnixNano()))
-	//rand.Seed(time.Now().UnixNano())
+	rand.Seed(time.Now().UnixNano())
 	if err := loadDotEnv(".env"); err != nil && !errors.Is(err, os.ErrNotExist) {
 		fmt.Fprintf(os.Stderr, "env load error: %v\n", err)
 		os.Exit(1)
