@@ -58,6 +58,10 @@ func main() {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		_ = httpServer.Shutdown(shutdownCtx)
+		// Close async recorder to shut down worker goroutines
+		if asyncRec, ok := recorder.(*replay.AsyncRecorder); ok {
+			asyncRec.Close()
+		}
 	}()
 
 	fmt.Printf("server listening on %s%s\n", cfg.HTTPAddr, cfg.WSPath)
