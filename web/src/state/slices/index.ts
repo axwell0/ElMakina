@@ -79,6 +79,9 @@ export function toGameState(sliced: SlicedGameState): GameState {
     turnTimer: sliced.game.turnTimer,
     pause: sliced.game.pause,
     gameOver: sliced.game.gameOver,
+    discardQueue: sliced.game.discardQueue,
+    currentDiscard: sliced.game.currentDiscard,
+    eliminatingPlayer: sliced.game.eliminatingPlayer,
 
     // UI
     sfxMuted: sliced.ui.sfxMuted,

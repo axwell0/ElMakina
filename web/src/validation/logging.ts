@@ -67,7 +67,7 @@ export const productionValidationLogger: ValidationLogger = {
     });
   },
 
-  logValidationMetric(messageType: string, duration: number) {
+  logValidationMetric(_messageType: string, _duration: number) {
     // Send to metrics service if needed
     // console.log(`[validation:metric] ${messageType}: ${duration}ms`);
   },
@@ -91,10 +91,9 @@ export const developmentValidationLogger: ValidationLogger = {
     console.warn("[validation:warning]", context);
   },
 
-  logValidationMetric(messageType: string, duration: number) {
-    if (typeof process !== "undefined" && process.env?.NODE_ENV === "development") {
-      console.log(`[validation:metric] ${messageType}: ${duration}ms`);
-    }
+  logValidationMetric(_messageType: string, _duration: number) {
+    // Send to metrics service if needed
+    // console.log(`[validation:metric] ${messageType}: ${duration}ms`);
   },
 };
 
