@@ -97,7 +97,7 @@ func (m *LobbyManager) CreateLobby(ctx context.Context, leaderID entities.Player
 
 // JoinLobby adds a player to a lobby atomically.
 func (m *LobbyManager) JoinLobby(ctx context.Context, lobbyID entities.LobbyID, playerID entities.PlayerID) error {
-	return m.unitOfWork.Execute(ctx, func(ctx context.Context) error {
+	err := m.unitOfWork.Execute(ctx, func(ctx context.Context) error {
 		// Get lobby and player within transaction
 		lobby, err := m.lobbyRepo.GetByID(ctx, lobbyID)
 		if err != nil {
@@ -117,6 +117,12 @@ func (m *LobbyManager) JoinLobby(ctx context.Context, lobbyID entities.LobbyID, 
 		// Save changes
 		return m.lobbyRepo.Save(ctx, lobby)
 	})
+	if err != nil {
+		return err
+	}
+	// Invalidate cache on successful write
+	m.invalidateCache(lobbyID)
+	return nil
 }
 
 // LeaveLobby removes a player from a lobby atomically.
@@ -138,13 +144,17 @@ func (m *LobbyManager) LeaveLobby(ctx context.Context, lobbyID entities.LobbyID,
 		// Save changes
 		return m.lobbyRepo.Save(ctx, lobby)
 	})
-
-	return shouldClose, err
+	if err != nil {
+		return shouldClose, err
+	}
+	// Invalidate cache on successful write
+	m.invalidateCache(lobbyID)
+	return shouldClose, nil
 }
 
 // StartLobby transitions a lobby to in-game status atomically.
 func (m *LobbyManager) StartLobby(ctx context.Context, lobbyID entities.LobbyID, leaderID entities.PlayerID) error {
-	return m.unitOfWork.Execute(ctx, func(ctx context.Context) error {
+	err := m.unitOfWork.Execute(ctx, func(ctx context.Context) error {
 		// Get lobby within transaction
 		lobby, err := m.lobbyRepo.GetByID(ctx, lobbyID)
 		if err != nil {
@@ -164,6 +174,12 @@ func (m *LobbyManager) StartLobby(ctx context.Context, lobbyID entities.LobbyID,
 		// Save changes
 		return m.lobbyRepo.Save(ctx, lobby)
 	})
+	if err != nil {
+		return err
+	}
+	// Invalidate cache on successful write
+	m.invalidateCache(lobbyID)
+	return nil
 }
 
 // GetLobby retrieves a lobby by ID.
@@ -289,6 +305,13 @@ func (m *LobbyManager) PruneEmptyOpenLobbies(ctx context.Context, online map[str
 	}
 
 	return removed, nil
+}
+
+// invalidateCache removes a lobby from the cache.
+func (m *LobbyManager) invalidateCache(lobbyID entities.LobbyID) {
+	m.mu.Lock()
+	delete(m.lobbyCache, lobbyID)
+	m.mu.Unlock()
 }
 
 // generateID creates a unique identifier.
