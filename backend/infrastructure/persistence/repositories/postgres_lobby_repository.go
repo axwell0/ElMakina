@@ -86,6 +86,7 @@ func (r *postgresLobbyRepository) GetByPlayerID(ctx context.Context, playerID en
 }
 
 // List retrieves lobbies matching the filter criteria.
+// Uses eager loading to avoid N+1 query pattern.
 func (r *postgresLobbyRepository) List(ctx context.Context, filter repositories.LobbyListFilter) ([]*entities.Lobby, error) {
 	db := r.getDB(ctx).Model(&models.LobbyModel{})
 
@@ -102,25 +103,27 @@ func (r *postgresLobbyRepository) List(ctx context.Context, filter repositories.
 		db = db.Offset(filter.Offset)
 	}
 
+	// Eager load player associations to avoid N+1 queries
 	var models_list []models.LobbyModel
-	result := db.Order("created_at DESC").Find(&models_list)
+	result := db.Preload("Players", func(db *gorm.DB) *gorm.DB {
+		return db.Order("joined_at ASC")
+	}).Order("created_at DESC").Find(&models_list)
+
 	if result.Error != nil {
 		return nil, fmt.Errorf("failed to list lobbies: %w", result.Error)
 	}
 
-	// Convert to entities
+	// Convert to entities - player associations already loaded
 	lobbies := make([]*entities.Lobby, len(models_list))
 	for i, model := range models_list {
-		// Load player associations
-		var playerModels []models.LobbyPlayerModel
-		r.getDB(ctx).Where("lobby_id = ?", model.ID).Order("joined_at ASC").Find(&playerModels)
-		lobbies[i] = mappers.LobbyToEntity(&model, playerModels)
+		lobbies[i] = mappers.LobbyToEntity(&model, model.Players)
 	}
 
 	return lobbies, nil
 }
 
 // ListWithPlayerCounts retrieves lobbies with player counts for listing.
+// Uses eager loading and a single JOIN query to avoid N+1 query pattern.
 func (r *postgresLobbyRepository) ListWithPlayerCounts(ctx context.Context, filter repositories.LobbyListFilter) ([]repositories.LobbySummary, error) {
 	db := r.getDB(ctx).Model(&models.LobbyModel{})
 
@@ -137,35 +140,38 @@ func (r *postgresLobbyRepository) ListWithPlayerCounts(ctx context.Context, filt
 		db = db.Offset(filter.Offset)
 	}
 
+	// Eager load player associations and their player details in a single query
 	var models_list []models.LobbyModel
-	result := db.Order("created_at DESC").Find(&models_list)
+	result := db.Preload("Players", func(db *gorm.DB) *gorm.DB {
+		return db.Order("joined_at ASC")
+	}).Preload("Players.Player").Order("created_at DESC").Find(&models_list)
+
 	if result.Error != nil {
 		return nil, fmt.Errorf("failed to list lobbies: %w", result.Error)
 	}
 
-	// Build summaries
+	// Build summaries - all data already loaded via Preload
 	summaries := make([]repositories.LobbySummary, len(models_list))
 	for i, model := range models_list {
-		// Load player associations
-		var playerModels []models.LobbyPlayerModel
-		r.getDB(ctx).Where("lobby_id = ?", model.ID).Order("joined_at ASC").Find(&playerModels)
+		playerNicks := make([]string, len(model.Players))
+		for j, pm := range model.Players {
+			playerNicks[j] = pm.Player.Nick
+		}
 
-		// Load leader nick
-		var leader models.PlayerModel
-		r.getDB(ctx).First(&leader, "id = ?", model.LeaderID)
-
-		playerNicks := make([]string, len(playerModels))
-		for j, pm := range playerModels {
-			var player models.PlayerModel
-			r.getDB(ctx).First(&player, "id = ?", pm.PlayerID)
-			playerNicks[j] = player.Nick
+		// Get leader nick from loaded players
+		leaderNick := ""
+		for _, pm := range model.Players {
+			if pm.PlayerID == model.LeaderID {
+				leaderNick = pm.Player.Nick
+				break
+			}
 		}
 
 		summaries[i] = repositories.LobbySummary{
 			ID:          entities.LobbyID(model.ID),
 			LeaderID:    entities.PlayerID(model.LeaderID),
-			LeaderNick:  leader.Nick,
-			PlayerCount: len(playerModels),
+			LeaderNick:  leaderNick,
+			PlayerCount: len(model.Players),
 			PlayerNicks: playerNicks,
 			Status:      entities.LobbyStatus(model.Status),
 			CreatedAt:   model.CreatedAt.Unix(),

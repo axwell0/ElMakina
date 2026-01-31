@@ -11,6 +11,20 @@ import (
 	"ElMakina/backend/domain/services"
 )
 
+// defaultCacheTTL is the time-to-live for cached lobby entries.
+const defaultCacheTTL = 5 * time.Minute
+
+// cacheEntry holds a cached lobby with its expiration time.
+type cacheEntry struct {
+	lobby     *entities.Lobby
+	expiresAt time.Time
+}
+
+// isExpired returns true if the cache entry has expired.
+func (e *cacheEntry) isExpired() bool {
+	return time.Now().After(e.expiresAt)
+}
+
 // LobbyManager coordinates lobby and player operations.
 // It provides a unified interface for the WebSocket server.
 type LobbyManager struct {
@@ -19,8 +33,9 @@ type LobbyManager struct {
 	unitOfWork    repositories.UnitOfWork
 	minPlayers    int
 	maxPlayers    int
+	cacheTTL      time.Duration
 	mu            sync.RWMutex
-	lobbyCache    map[entities.LobbyID]*entities.Lobby
+	lobbyCache    map[entities.LobbyID]*cacheEntry
 }
 
 // NewLobbyManager creates a new lobby manager with all dependencies.
@@ -36,7 +51,8 @@ func NewLobbyManager(
 		unitOfWork:    unitOfWork,
 		minPlayers:    minPlayers,
 		maxPlayers:    maxPlayers,
-		lobbyCache:    make(map[entities.LobbyID]*entities.Lobby),
+		cacheTTL:      defaultCacheTTL,
+		lobbyCache:    make(map[entities.LobbyID]*cacheEntry),
 	}
 }
 
@@ -87,10 +103,8 @@ func (m *LobbyManager) CreateLobby(ctx context.Context, leaderID entities.Player
 		return nil, fmt.Errorf("failed to save lobby: %w", err)
 	}
 
-	// Update cache
-	m.mu.Lock()
-	m.lobbyCache[lobby.ID()] = lobby
-	m.mu.Unlock()
+	// Invalidate cache to ensure consistency (cache will be repopulated on next GetLobby)
+	m.invalidateCache(lobby.ID())
 
 	return lobby, nil
 }
@@ -182,13 +196,13 @@ func (m *LobbyManager) StartLobby(ctx context.Context, lobbyID entities.LobbyID,
 	return nil
 }
 
-// GetLobby retrieves a lobby by ID.
+// GetLobby retrieves a lobby by ID with TTL-based cache.
 func (m *LobbyManager) GetLobby(ctx context.Context, id entities.LobbyID) (*entities.Lobby, error) {
-	// Check cache first
+	// Check cache first with TTL validation
 	m.mu.RLock()
-	if lobby, ok := m.lobbyCache[id]; ok {
+	if entry, ok := m.lobbyCache[id]; ok && !entry.isExpired() {
 		m.mu.RUnlock()
-		return lobby, nil
+		return entry.lobby, nil
 	}
 	m.mu.RUnlock()
 
@@ -198,9 +212,12 @@ func (m *LobbyManager) GetLobby(ctx context.Context, id entities.LobbyID) (*enti
 		return nil, err
 	}
 
-	// Update cache
+	// Update cache with TTL
 	m.mu.Lock()
-	m.lobbyCache[id] = lobby
+	m.lobbyCache[id] = &cacheEntry{
+		lobby:     lobby,
+		expiresAt: time.Now().Add(m.cacheTTL),
+	}
 	m.mu.Unlock()
 
 	return lobby, nil
