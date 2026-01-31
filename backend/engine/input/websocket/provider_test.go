@@ -87,7 +87,7 @@ func mustJSON(t *testing.T, v any) RawMessage {
 }
 
 func TestProviderRequestAction(t *testing.T) {
-	p := NewProvider()
+	p := NewProvider(nil)
 	conn := registerFake(t, p, 0)
 
 	resCh := make(chan *models.PlayerAction, 1)
@@ -123,7 +123,7 @@ func TestProviderRequestAction(t *testing.T) {
 }
 
 func TestProviderChallengeResponses(t *testing.T) {
-	p := NewProvider()
+	p := NewProvider(nil)
 	conn := registerFake(t, p, 1)
 
 	window := engine.ChallengeWindow{
@@ -163,7 +163,7 @@ func TestProviderChallengeResponses(t *testing.T) {
 }
 
 func TestProviderCounterResponses(t *testing.T) {
-	p := NewProvider()
+	p := NewProvider(nil)
 	conn := registerFake(t, p, 1)
 
 	window := engine.CounterWindow{
@@ -204,7 +204,7 @@ func TestProviderCounterResponses(t *testing.T) {
 }
 
 func TestProviderDisconnectAbortsRequest(t *testing.T) {
-	p := NewProvider()
+	p := NewProvider(nil)
 	conn := registerFake(t, p, 0)
 
 	done := make(chan error, 1)
@@ -221,7 +221,7 @@ func TestProviderDisconnectAbortsRequest(t *testing.T) {
 }
 
 func TestProviderUnknownRequestIDReportsError(t *testing.T) {
-	p := NewProvider()
+	p := NewProvider(nil)
 	_ = registerFake(t, p, 0)
 
 	p.dispatch(0, Envelope{
@@ -236,7 +236,7 @@ func TestProviderUnknownRequestIDReportsError(t *testing.T) {
 }
 
 func TestProviderActionMissingSourceIndexFails(t *testing.T) {
-	p := NewProvider()
+	p := NewProvider(nil)
 	conn := registerFake(t, p, 0)
 
 	resCh := make(chan *models.PlayerAction, 1)
@@ -263,7 +263,7 @@ func TestProviderActionMissingSourceIndexFails(t *testing.T) {
 }
 
 func TestProviderActionGuessWithoutTargetFails(t *testing.T) {
-	p := NewProvider()
+	p := NewProvider(nil)
 	conn := registerFake(t, p, 0)
 
 	resCh := make(chan *models.PlayerAction, 1)
@@ -293,7 +293,7 @@ func TestProviderActionGuessWithoutTargetFails(t *testing.T) {
 }
 
 func TestProviderChallengeMissingChallengerIndexReportsError(t *testing.T) {
-	p := NewProvider()
+	p := NewProvider(nil)
 	conn := registerFake(t, p, 1)
 
 	window := engine.ChallengeWindow{

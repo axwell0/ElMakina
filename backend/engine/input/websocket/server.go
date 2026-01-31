@@ -25,7 +25,7 @@ type Server struct {
 // NewServer constructs a wrapper server with /ws mapped to the provider.
 func NewServer(addr string, provider *Provider) *Server {
 	if provider == nil {
-		provider = NewProvider()
+		provider = NewProvider(nil)
 	}
 	mux := http.NewServeMux()
 	mux.Handle("/ws", provider)
