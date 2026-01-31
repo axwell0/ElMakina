@@ -14,7 +14,7 @@ import {HandTray} from './game/HandTray';
 import {HoverRoleCard, type RoleDetailsMap} from './game/HoverRoleCard';
 import {SelfHud} from './game/SelfHud';
 import {getPlayerPositions} from '../lib/layout';
-import {ChatBox} from './game/ChatBox';
+import {ChatComponent} from './game/ChatComponent';
 import {ArrowLeft, Coins, Flame, Moon, Sun, Volume2, VolumeX} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import {socket} from '@/network/socket';
@@ -239,25 +239,7 @@ export const GameView: React.FC = () => {
                                     </div>
                                 )}
 
-                                {/* Hand Cards */}
-                                <div className="flex w-full items-center justify-center">
-                                    <HandTray
-                                        hand={state.hand}
-                                        isActive={state.activePlayerIndex === state.identity?.playerIndex}
-                                        onHoverStart={() => {
-                                            if (state.activePlayerIndex === state.identity?.playerIndex) {
-                                                // Optional: highlight relevant actions
-                                            }
-                                        }}
-                                        onHoverEnd={() => { }}
-                                    />
-                                </div>
                             </div>
-                        </div>
-
-                        {/* Chat Box at the bottom of sidebar */}
-                        <div className="mt-4">
-                            <ChatBox />
                         </div>
                     </div>
 
@@ -477,6 +459,21 @@ export const GameView: React.FC = () => {
                     />
                 </div>
             </main>
+
+            {/* Floating HandTray at bottom center */}
+            <HandTray
+                hand={state.hand}
+                isActive={state.activePlayerIndex === state.identity?.playerIndex}
+                onHoverStart={(role) => {
+                    if (state.activePlayerIndex === state.identity?.playerIndex) {
+                        // Optional: highlight relevant actions
+                    }
+                }}
+                onHoverEnd={() => { }}
+            />
+
+            {/* Floating Chat Component */}
+            <ChatComponent />
 
             <PhaseOverlay />
             <GamePausedOverlay />
