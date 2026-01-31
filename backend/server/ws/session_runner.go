@@ -318,6 +318,13 @@ func (r *sessionRunner) EnqueueOnline(playerID string) {
 	}
 }
 
+func (r *sessionRunner) EnqueueForfeit(playerID string) {
+	select {
+	case r.cmdCh <- sessionCommand{fn: func() { r.Forfeit(playerID) }}:
+	default:
+	}
+}
+
 func (r *sessionRunner) messageLoop() {
 	for {
 		select {

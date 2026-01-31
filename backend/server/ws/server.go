@@ -209,7 +209,7 @@ func (s *Server) unregisterClient(client *clientConn, err error) {
 	if client.session != nil {
 		client.session.provider.detach(client.playerIndex, client)
 		client.session.EnqueueOffline(client.playerID.String())
-		s.forfeit.Schedule(client.playerID.String(), func() { client.session.Forfeit(client.playerID.String()) })
+		s.forfeit.Schedule(client.playerID.String(), func() { client.session.EnqueueForfeit(client.playerID.String()) })
 		return
 	}
 	if client.lobbyID != "" {
