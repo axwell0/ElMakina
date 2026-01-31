@@ -263,7 +263,7 @@ func newSessionRunner(session *server.GameSession, clock engine.Clock, cfg engin
 		cfg:      cfg,
 		grace:    grace,
 		errCh:    make(chan error, 4),
-		cmdCh:    make(chan sessionCommand, 64),
+		cmdCh:    make(chan sessionCommand, 256), // Increased buffer to handle burst traffic
 		offline:  make(map[string]struct{}),
 		kicked:   make(map[string]struct{}),
 		events:   events,
@@ -282,11 +282,23 @@ func (r *sessionRunner) Start() {
 	}
 	r.wg.Add(2)
 	go func() {
-		defer r.wg.Done()
+		defer func() {
+			if rec := recover(); rec != nil {
+				log.Printf("sessionRunner messageLoop panic: %v", rec)
+				r.notifyError(fmt.Errorf("messageLoop panic: %v", rec))
+			}
+			r.wg.Done()
+		}()
 		r.messageLoop()
 	}()
 	go func() {
-		defer r.wg.Done()
+		defer func() {
+			if rec := recover(); rec != nil {
+				log.Printf("sessionRunner run panic: %v", rec)
+				r.notifyError(fmt.Errorf("run panic: %v", rec))
+			}
+			r.wg.Done()
+		}()
 		r.run()
 	}()
 }
@@ -299,31 +311,23 @@ func (r *sessionRunner) Stop() {
 }
 
 func (r *sessionRunner) EnqueueClientEnvelope(senderIndex int, env Envelope) {
-	select {
-	case r.cmdCh <- sessionCommand{senderIndex: senderIndex, env: &env}:
-	default:
-	}
+	// Blocking send to ensure no messages are lost under load
+	r.cmdCh <- sessionCommand{senderIndex: senderIndex, env: &env}
 }
 
 func (r *sessionRunner) EnqueueOffline(playerID string) {
-	select {
-	case r.cmdCh <- sessionCommand{fn: func() { r.markOffline(playerID) }}:
-	default:
-	}
+	// Blocking send to ensure connection state changes are never lost
+	r.cmdCh <- sessionCommand{fn: func() { r.markOffline(playerID) }}
 }
 
 func (r *sessionRunner) EnqueueOnline(playerID string) {
-	select {
-	case r.cmdCh <- sessionCommand{fn: func() { r.markOnline(playerID) }}:
-	default:
-	}
+	// Blocking send to ensure connection state changes are never lost
+	r.cmdCh <- sessionCommand{fn: func() { r.markOnline(playerID) }}
 }
 
 func (r *sessionRunner) EnqueueForfeit(playerID string) {
-	select {
-	case r.cmdCh <- sessionCommand{fn: func() { r.Forfeit(playerID) }}:
-	default:
-	}
+	// Blocking send to ensure forfeit commands are never lost
+	r.cmdCh <- sessionCommand{fn: func() { r.Forfeit(playerID) }}
 }
 
 func (r *sessionRunner) messageLoop() {
