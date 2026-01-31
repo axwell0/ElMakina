@@ -231,6 +231,66 @@ func (m *LobbyManager) PruneEmptyLobbies(ctx context.Context, olderThan time.Dur
 	return removed, nil
 }
 
+// ResetInGameLobbiesToOpen resets all in-game lobbies to open status.
+// This is used on server startup to recover from crashes.
+func (m *LobbyManager) ResetInGameLobbiesToOpen(ctx context.Context) error {
+	status := entities.LobbyInGame
+	lobbies, err := m.lobbyRepo.List(ctx, repositories.LobbyListFilter{
+		Status: &status,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to list in-game lobbies: %w", err)
+	}
+
+	for _, lobby := range lobbies {
+		if err := lobby.ResetToOpen(); err != nil {
+			// Log error but continue
+			continue
+		}
+		if err := m.lobbyRepo.Save(ctx, lobby); err != nil {
+			// Log error but continue
+			continue
+		}
+	}
+
+	return nil
+}
+
+// PruneEmptyOpenLobbies removes open lobbies that have no online members.
+// The online map contains player IDs that are currently connected.
+func (m *LobbyManager) PruneEmptyOpenLobbies(ctx context.Context, online map[string]struct{}) ([]entities.LobbyID, error) {
+	status := entities.LobbyOpen
+	lobbies, err := m.lobbyRepo.List(ctx, repositories.LobbyListFilter{
+		Status: &status,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list open lobbies: %w", err)
+	}
+
+	var removed []entities.LobbyID
+	for _, lobby := range lobbies {
+		// Check if any player in the lobby is online
+		hasOnlinePlayer := false
+		for _, playerID := range lobby.PlayerIDs() {
+			if _, ok := online[playerID.String()]; ok {
+				hasOnlinePlayer = true
+				break
+			}
+		}
+
+		// If no online players, delete the lobby
+		if !hasOnlinePlayer {
+			if err := m.lobbyRepo.Delete(ctx, lobby.ID()); err != nil {
+				// Log error but continue
+				continue
+			}
+			removed = append(removed, lobby.ID())
+		}
+	}
+
+	return removed, nil
+}
+
 // generateID creates a unique identifier.
 func generateID() string {
 	// Simple implementation - in production use UUID
