@@ -38,6 +38,10 @@ export function useGameSlice(): { game: GameSliceState & { isConnected: boolean 
     turnTimer: state.turnTimer,
     pause: state.pause,
     gameOver: state.gameOver,
+    // Card discard state
+    discardQueue: state.discardQueue,
+    currentDiscard: state.currentDiscard,
+    eliminatingPlayer: state.eliminatingPlayer,
     // Include isConnected from the connection slice of legacy state
     isConnected: state.isConnected,
   };
