@@ -401,7 +401,9 @@ func (s *Server) reattachToLobby(client *clientConn) {
 	}
 	lobbyID := lobby.ID()
 	client.lobbyID = lobbyID
+	s.mu.Lock()
 	session := s.sessions[lobbyID.String()]
+	s.mu.Unlock()
 	if session == nil {
 		// Reset lobby to open if no session exists
 		lobby.ResetToOpen()
