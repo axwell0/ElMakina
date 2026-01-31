@@ -7,7 +7,7 @@ import (
 )
 
 func TestServerRegistersWSHandler(t *testing.T) {
-	s := NewServer(":0", NewProvider())
+	s := NewServer(":0", NewProvider(nil))
 
 	req := httptest.NewRequest(http.MethodGet, "http://example/ws", nil)
 	rec := httptest.NewRecorder()
@@ -20,7 +20,7 @@ func TestServerRegistersWSHandler(t *testing.T) {
 }
 
 func TestServerOtherPathNotFound(t *testing.T) {
-	s := NewServer(":0", NewProvider())
+	s := NewServer(":0", NewProvider(nil))
 
 	req := httptest.NewRequest(http.MethodGet, "http://example/other", nil)
 	rec := httptest.NewRecorder()

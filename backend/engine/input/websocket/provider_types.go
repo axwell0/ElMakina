@@ -20,36 +20,37 @@ import (
 //
 // KEY DESIGN DECISIONS:
 //
-// 1. PULL-BASED, NOT PUSH-BASED
-//    The engine asks for input when it needs it. We don't broadcast game state
-//    constantly and hope players respond appropriately. The engine drives the flow.
+//  1. PULL-BASED, NOT PUSH-BASED
+//     The engine asks for input when it needs it. We don't broadcast game state
+//     constantly and hope players respond appropriately. The engine drives the flow.
 //
-// 2. REQUEST CORRELATION (request_id)
-//    Every request gets a unique ID. Responses must include this ID so we know
-//    which question they're answering. This handles race conditions where a slow
-//    response to an old request arrives after we've moved on.
+//  2. REQUEST CORRELATION (request_id)
+//     Every request gets a unique ID. Responses must include this ID so we know
+//     which question they're answering. This handles race conditions where a slow
+//     response to an old request arrives after we've moved on.
 //
-// 3. WAITER PATTERN
-//    When we send a request, we register a "waiter" (a channel). The goroutine
-//    handling WebSocket responses finds the right waiter and delivers the message.
-//    This decouples the WebSocket read loop from the engine's request loop.
+//  3. WAITER PATTERN
+//     When we send a request, we register a "waiter" (a channel). The goroutine
+//     handling WebSocket responses finds the right waiter and delivers the message.
+//     This decouples the WebSocket read loop from the engine's request loop.
 //
-// 4. DISCONNECT HANDLING
-//    WebSocket disconnects are terminal. If a player drops mid-turn, we signal
-//    an error on errCh. The orchestrator decides how to handle this (forfeit, AI, etc.)
+//  4. DISCONNECT HANDLING
+//     WebSocket disconnects are terminal. If a player drops mid-turn, we signal
+//     an error on errCh. The orchestrator decides how to handle this (forfeit, AI, etc.)
 //
 // CONCURRENCY SAFETY:
 //   - mu (RWMutex) protects conns and pending maps
 //   - Each connection has its own sendMu for serialized writes
 //   - The WebSocket read loop runs in a separate goroutine per connection
 type Provider struct {
-	upgrader ws.Upgrader // Gorilla WebSocket upgrader with CORS settings
+	upgrader       ws.Upgrader         // Gorilla WebSocket upgrader with CORS settings
+	allowedOrigins map[string]struct{} // Allowed Origins for CORS validation
 
-	mu      sync.RWMutex         // Guards the maps below
-	conns   map[int]*connState   // player_index -> WebSocket connection
-	pending map[string]*waiter   // request_id -> channel waiting for response
-	errCh   chan error           // Terminal errors (disconnects) flow here
-	nextID  uint64               // Atomic counter for generating request IDs
+	mu      sync.RWMutex       // Guards the maps below
+	conns   map[int]*connState // player_index -> WebSocket connection
+	pending map[string]*waiter // request_id -> channel waiting for response
+	errCh   chan error         // Terminal errors (disconnects) flow here
+	nextID  uint64             // Atomic counter for generating request IDs
 }
 
 // connState tracks a single player's WebSocket connection.
@@ -101,17 +102,28 @@ type waiter struct {
 	ch chan responseEnvelope // Channel where the response will be delivered
 }
 
-// NewProvider constructs a WebSocket input provider with permissive origin checks.
-func NewProvider() *Provider {
+// NewProvider constructs a WebSocket input provider with the given allowed origins.
+// If allowedOrigins is empty, all origins are permitted (development mode).
+func NewProvider(allowedOrigins []string) *Provider {
+	originSet := make(map[string]struct{}, len(allowedOrigins))
+	for _, o := range allowedOrigins {
+		originSet[o] = struct{}{}
+	}
 	return &Provider{
 		upgrader: ws.Upgrader{
 			CheckOrigin: func(r *http.Request) bool {
-				return true
+				if len(originSet) == 0 {
+					return true
+				}
+				origin := r.Header.Get("Origin")
+				_, ok := originSet[origin]
+				return ok
 			},
 		},
-		conns:   make(map[int]*connState),
-		pending: make(map[string]*waiter),
-		errCh:   make(chan error, 4),
+		allowedOrigins: originSet,
+		conns:          make(map[int]*connState),
+		pending:        make(map[string]*waiter),
+		errCh:          make(chan error, 4),
 	}
 }
 
