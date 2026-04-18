@@ -1,0 +1,11 @@
+# File: .gitignore
+# Purpose: Lists generated or machine-specific paths that should stay out of version control.
+.idea
+node_modules
+.vscode
+go.sum
+bun.lock
+.env
+.husky
+.next
+.bun

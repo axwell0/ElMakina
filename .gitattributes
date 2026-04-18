@@ -1,0 +1,4 @@
+# File: .gitattributes
+# Purpose: Normalizes repository text behavior so line endings and diff handling stay predictable.
+# Normalize line endings across platforms.
+* text=auto eol=lf
