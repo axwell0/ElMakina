@@ -45,3 +45,54 @@ func payloadToMap(payload any) (map[string]any, error) {
 	}
 	return decoded, nil
 }
+
+func DecodeCommandEnvelope(sessionID string, message CommandEnvelopeMessage) (sessionapp.CommandEnvelope, error) {
+	if message.Type != TypeCommand {
+		return sessionapp.CommandEnvelope{}, fmt.Errorf("unsupported command envelope type %q", message.Type)
+	}
+	command := sessionapp.CommandEnvelope{
+		InteractionID: message.InteractionID,
+		Kind:          sessionapp.CommandKind(message.Kind),
+		SessionID:     sessionID,
+	}
+	switch command.Kind {
+	case sessionapp.CommandMainAction:
+		var payload sessionapp.MainActionCommand
+		if err := decodePayload(message.Payload, &payload); err != nil {
+			return sessionapp.CommandEnvelope{}, err
+		}
+		command.Payload = payload
+	case sessionapp.CommandChallengeDecision:
+		var payload sessionapp.ChallengeDecisionCommand
+		if err := decodePayload(message.Payload, &payload); err != nil {
+			return sessionapp.CommandEnvelope{}, err
+		}
+		command.Payload = payload
+	case sessionapp.CommandCounterDecision:
+		var payload sessionapp.CounterDecisionCommand
+		if err := decodePayload(message.Payload, &payload); err != nil {
+			return sessionapp.CommandEnvelope{}, err
+		}
+		command.Payload = payload
+	case sessionapp.CommandCardSelection:
+		var payload sessionapp.CardSelectionCommand
+		if err := decodePayload(message.Payload, &payload); err != nil {
+			return sessionapp.CommandEnvelope{}, err
+		}
+		command.Payload = payload
+	default:
+		return sessionapp.CommandEnvelope{}, fmt.Errorf("unsupported command kind %q", command.Kind)
+	}
+	return command, nil
+}
+
+func decodePayload(payload map[string]any, target any) error {
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("encode command payload: %w", err)
+	}
+	if err := json.Unmarshal(encoded, target); err != nil {
+		return fmt.Errorf("decode command payload: %w", err)
+	}
+	return nil
+}

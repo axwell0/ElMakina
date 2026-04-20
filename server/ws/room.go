@@ -146,6 +146,12 @@ func (r *Room) handleIncoming(sessionID string, envelope incomingEnvelope) error
 			return err
 		}
 		return r.HandleSubmitAction(sessionID, message)
+	case TypeCommand:
+		var message CommandEnvelopeMessage
+		if err := json.Unmarshal(envelope.Raw, &message); err != nil {
+			return err
+		}
+		return r.HandleCommand(sessionID, message)
 	case TypeSubmitChallenge:
 		var message SubmitChallengeMessage
 		if err := json.Unmarshal(envelope.Raw, &message); err != nil {
@@ -494,6 +500,14 @@ func (r *Room) HandleSubmitStep(sessionID string, message SubmitStepMessage) err
 		return err
 	}
 	return r.session.SubmitStepResponse(sessionID, response)
+}
+
+func (r *Room) HandleCommand(sessionID string, message CommandEnvelopeMessage) error {
+	command, err := DecodeCommandEnvelope(sessionID, message)
+	if err != nil {
+		return err
+	}
+	return r.session.SubmitCommand(command)
 }
 
 // HandleReady marks a lobby player as ready.

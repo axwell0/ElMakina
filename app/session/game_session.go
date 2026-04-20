@@ -480,6 +480,87 @@ func (s *GameSession) OpenInputEvents() <-chan OpenInput {
 	return s.openInputEvents
 }
 
+// SubmitCommand validates a canonical command envelope against the active interaction.
+func (s *GameSession) SubmitCommand(command CommandEnvelope) error {
+	interaction := s.InteractionState()
+	if interaction == nil {
+		return fmt.Errorf("no active interaction")
+	}
+	if interaction.ID != command.InteractionID {
+		return fmt.Errorf("command %q does not match active interaction %q", command.InteractionID, interaction.ID)
+	}
+
+	caller := s.Session(command.SessionID)
+	if caller == nil {
+		return fmt.Errorf("session %q is not registered in room %q", command.SessionID, s.ID)
+	}
+	if !playerAllowed(interaction.Recipients.Players, caller.PlayerIndex) {
+		return fmt.Errorf("session %q is not an allowed recipient for interaction %q", command.SessionID, interaction.ID)
+	}
+
+	switch command.Kind {
+	case CommandMainAction:
+		payload, ok := command.Payload.(MainActionCommand)
+		if !ok {
+			return fmt.Errorf("main action command payload has unexpected type %T", command.Payload)
+		}
+		action, err := actionFromMainActionCommand(payload)
+		if err != nil {
+			return err
+		}
+		return s.SubmitMainAction(command.SessionID, action)
+	case CommandChallengeDecision:
+		payload, ok := command.Payload.(ChallengeDecisionCommand)
+		if !ok {
+			return fmt.Errorf("challenge command payload has unexpected type %T", command.Payload)
+		}
+		decision := ports.ChallengeDecision{
+			ChallengerIndex: payload.ChallengerIndex,
+			Pass:            payload.Pass,
+		}
+		if payload.ChallengerDiscardIndex != nil {
+			decision.ChallengerDiscardIndex = *payload.ChallengerDiscardIndex
+		}
+		if payload.ActorDiscardIndex != nil {
+			decision.ActorDiscardIndex = *payload.ActorDiscardIndex
+		}
+		if payload.ActorProvingCardIndex != nil {
+			decision.ActorProvingCardIndex = *payload.ActorProvingCardIndex
+		}
+		return s.SubmitChallengeDecision(command.SessionID, decision)
+	case CommandCounterDecision:
+		payload, ok := command.Payload.(CounterDecisionCommand)
+		if !ok {
+			return fmt.Errorf("counter command payload has unexpected type %T", command.Payload)
+		}
+		decision := ports.CounterDecision{
+			PlayerIndex: payload.PlayerIndex,
+			Pass:        payload.Pass,
+		}
+		if payload.Command != nil {
+			mainAction, err := actionFromMainActionCommand(*payload.Command)
+			if err != nil {
+				return err
+			}
+			decision.Command = mainAction
+		}
+		return s.SubmitCounterDecision(command.SessionID, decision)
+	case CommandCardSelection:
+		payload, ok := command.Payload.(CardSelectionCommand)
+		if !ok {
+			return fmt.Errorf("card selection command payload has unexpected type %T", command.Payload)
+		}
+		return s.SubmitStepResponse(command.SessionID, corestate.StepResponse{
+			Kind: corestate.StepCardSelection,
+			CardSelection: &corestate.CardSelectionResponse{
+				SelectedIndices: append([]int(nil), payload.SelectedIndices...),
+			},
+		})
+	default:
+		return fmt.Errorf("unsupported command kind %q", command.Kind)
+	}
+}
+
 // SubmitMainAction delivers the main action to the running turn.
 func (s *GameSession) SubmitMainAction(sessionID string, action *coretypes.PlayerAction) error {
 	// Main actions are routed through the active turn broker, not applied directly to state.
@@ -827,6 +908,42 @@ func appendUniqueClient(clients []Client, candidate Client) []Client {
 		}
 	}
 	return append(clients, candidate)
+}
+
+func actionFromMainActionCommand(command MainActionCommand) (*coretypes.PlayerAction, error) {
+	if command.ActionID == "" {
+		return nil, fmt.Errorf("action id is required")
+	}
+	action := &coretypes.PlayerAction{
+		ID:         coretypes.ActionID(command.ActionID),
+		ActorIndex: command.ActorIndex,
+	}
+	if command.TargetIndex != nil && command.Guess != "" {
+		role, err := coretypes.ParseRole(command.Guess)
+		if err != nil {
+			return nil, err
+		}
+		action.Payload = coretypes.AccusePayload{
+			TargetIndex: *command.TargetIndex,
+			Guess:       role,
+		}
+		return action, nil
+	}
+	if command.TargetIndex != nil {
+		action.Payload = coretypes.TargetPayload{TargetIndex: *command.TargetIndex}
+		return action, nil
+	}
+	action.Payload = coretypes.NoPayload{}
+	return action, nil
+}
+
+func playerAllowed(allowed []int, playerIndex int) bool {
+	for _, candidate := range allowed {
+		if candidate == playerIndex {
+			return true
+		}
+	}
+	return false
 }
 
 func newGameState(playerCount int, rng *rand.Rand) (corestate.GameState, error) {
