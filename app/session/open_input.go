@@ -15,7 +15,8 @@ const (
 	InputStep       InputKind = "step"
 )
 
-// Deprecated: superseded by InteractionState during prompt-path redesign.
+// Deprecated: retained only until runtime-facing InputBroker internals are
+// fully hidden.
 //
 // OpenInput is a snapshot of the active input window exposed by InputBroker.
 type OpenInput struct {

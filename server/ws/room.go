@@ -147,36 +147,12 @@ func (r *Room) handleIncoming(sessionID string, envelope incomingEnvelope) error
 		}
 		r.startGameLoop()
 		return nil
-	case TypeSubmitAction:
-		var message SubmitActionMessage
-		if err := json.Unmarshal(envelope.Raw, &message); err != nil {
-			return err
-		}
-		return r.HandleSubmitAction(sessionID, message)
 	case TypeCommand:
 		var message CommandEnvelopeMessage
 		if err := json.Unmarshal(envelope.Raw, &message); err != nil {
 			return err
 		}
 		return r.HandleCommand(sessionID, message)
-	case TypeSubmitChallenge:
-		var message SubmitChallengeMessage
-		if err := json.Unmarshal(envelope.Raw, &message); err != nil {
-			return err
-		}
-		return r.HandleSubmitChallenge(sessionID, message)
-	case TypeSubmitCounter:
-		var message SubmitCounterMessage
-		if err := json.Unmarshal(envelope.Raw, &message); err != nil {
-			return err
-		}
-		return r.HandleSubmitCounter(sessionID, message)
-	case TypeSubmitStep:
-		var message SubmitStepMessage
-		if err := json.Unmarshal(envelope.Raw, &message); err != nil {
-			return err
-		}
-		return r.HandleSubmitStep(sessionID, message)
 	default:
 		return fmt.Errorf("unsupported message type %q", envelope.Type)
 	}
@@ -431,111 +407,6 @@ func (r *Room) RunTurn(ctx context.Context) (*runtimeturn.TurnResult, error) {
 	}
 }
 
-func (r *Room) HandleSubmitAction(sessionID string, message SubmitActionMessage) error {
-	// Validate the room ID before looking at the player's submitted action.
-	if err := r.validateRoom(message.RoomID); err != nil {
-		return err
-	}
-	// The websocket must still map to a registered session in this room.
-	session, err := r.sessionForID(sessionID)
-	if err != nil {
-		return err
-	}
-	openInput, err := r.requireOpenInput(sessionapp.InputMainAction)
-	if err != nil {
-		return err
-	}
-	// Only the actor assigned by the current prompt may submit the action.
-	if session.PlayerIndex != openInput.Actor {
-		return fmt.Errorf("session %q is not allowed to answer main action prompt", sessionID)
-	}
-	// Decode the payload into the engine's internal action representation.
-	action, err := DecodeSubmitAction(message)
-	if err != nil {
-		return err
-	}
-	// Prevent spoofed submissions by ensuring the action matches the websocket owner.
-	if action.ActorIndex != session.PlayerIndex {
-		return fmt.Errorf("action actor %d does not match session player %d", action.ActorIndex, session.PlayerIndex)
-	}
-	return r.session.SubmitMainAction(sessionID, action)
-}
-
-func (r *Room) HandleSubmitChallenge(sessionID string, message SubmitChallengeMessage) error {
-	// Challenges are room-scoped, so the room ID must match before we accept the answer.
-	if err := r.validateRoom(message.RoomID); err != nil {
-		return err
-	}
-	session, err := r.sessionForID(sessionID)
-	if err != nil {
-		return err
-	}
-	openInput, err := r.requireOpenInput(sessionapp.InputChallenge)
-	if err != nil {
-		return err
-	}
-	if openInput.Challenge == nil || !containsPlayer(openInput.Challenge.AllowedChallengers, session.PlayerIndex) {
-		return fmt.Errorf("session %q is not allowed to answer challenge prompt", sessionID)
-	}
-	// The challenge response is derived from the submitted payload and then validated against the caller.
-	decision := DecodeSubmitChallenge(message)
-	if decision.ChallengerIndex != session.PlayerIndex {
-		return fmt.Errorf("challenge player %d does not match session player %d", decision.ChallengerIndex, session.PlayerIndex)
-	}
-	return r.session.SubmitChallengeDecision(sessionID, decision)
-}
-
-func (r *Room) HandleSubmitCounter(sessionID string, message SubmitCounterMessage) error {
-	// Counter prompts are only valid within the room they were generated for.
-	if err := r.validateRoom(message.RoomID); err != nil {
-		return err
-	}
-	session, err := r.sessionForID(sessionID)
-	if err != nil {
-		return err
-	}
-	openInput, err := r.requireOpenInput(sessionapp.InputCounter)
-	if err != nil {
-		return err
-	}
-	if openInput.Counter == nil || !containsPlayer(openInput.Counter.AllowedPlayers, session.PlayerIndex) {
-		return fmt.Errorf("session %q is not allowed to answer counter prompt", sessionID)
-	}
-	// Decode and then cross-check the response so the payload cannot claim a different player.
-	decision, err := DecodeSubmitCounter(message)
-	if err != nil {
-		return err
-	}
-	if decision.PlayerIndex != session.PlayerIndex {
-		return fmt.Errorf("counter player %d does not match session player %d", decision.PlayerIndex, session.PlayerIndex)
-	}
-	return r.session.SubmitCounterDecision(sessionID, decision)
-}
-
-func (r *Room) HandleSubmitStep(sessionID string, message SubmitStepMessage) error {
-	// Step responses are also tied to the owning room, so reject mismatches early.
-	if err := r.validateRoom(message.RoomID); err != nil {
-		return err
-	}
-	session, err := r.sessionForID(sessionID)
-	if err != nil {
-		return err
-	}
-	openInput, err := r.requireOpenInput(sessionapp.InputStep)
-	if err != nil {
-		return err
-	}
-	if openInput.Step == nil || openInput.Actor != session.PlayerIndex {
-		return fmt.Errorf("session %q is not allowed to answer step prompt", sessionID)
-	}
-	// The step decoder needs the live prompt so it can interpret the response correctly.
-	response, err := DecodeSubmitStep(openInput.Step, message)
-	if err != nil {
-		return err
-	}
-	return r.session.SubmitStepResponse(sessionID, response)
-}
-
 func (r *Room) HandleCommand(sessionID string, message CommandEnvelopeMessage) error {
 	command, err := DecodeCommandEnvelope(sessionID, message)
 	if err != nil {
@@ -653,18 +524,6 @@ func (r *Room) requireLeaderSession(sessionID string) (*sessionapp.ClientSession
 		return nil, fmt.Errorf("player %d is not the lobby leader", session.PlayerIndex)
 	}
 	return session, nil
-}
-
-func (r *Room) requireOpenInput(kind sessionapp.InputKind) (*sessionapp.OpenInput, error) {
-	// Handlers only proceed when the session is currently waiting on the expected prompt type.
-	openInput := r.session.OpenInput()
-	if openInput == nil {
-		return nil, fmt.Errorf("session has no open input")
-	}
-	if openInput.Kind != kind {
-		return nil, fmt.Errorf("session is waiting on %q input, not %q", openInput.Kind, kind)
-	}
-	return openInput, nil
 }
 
 func containsPlayer(players []int, playerIndex int) bool {

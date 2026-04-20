@@ -4,22 +4,13 @@ package ws
 type MessageType string
 
 const (
-	TypeRoomSync         MessageType = "room.sync"
-	TypePrompt           MessageType = "prompt"
-	TypePromptMainAction MessageType = "prompt.main_action"
-	TypePromptChallenge  MessageType = "prompt.challenge"
-	TypePromptCounter    MessageType = "prompt.counter"
-	TypePromptStep       MessageType = "prompt.step"
-	TypeTurnResult       MessageType = "turn.result"
-	TypeGameOver         MessageType = "game.over"
-
-	TypeCommand         MessageType = "command"
-	TypeSubmitAction    MessageType = "action.submit"
-	TypeSubmitChallenge MessageType = "challenge.submit"
-	TypeSubmitCounter   MessageType = "counter.submit"
-	TypeSubmitStep      MessageType = "step.submit"
-	TypeSubmitReady     MessageType = "room.ready"
-	TypeSubmitStart     MessageType = "room.start"
+	TypeRoomSync     MessageType = "room.sync"
+	TypePrompt       MessageType = "prompt"
+	TypeTurnResult   MessageType = "turn.result"
+	TypeGameOver     MessageType = "game.over"
+	TypeCommand      MessageType = "command"
+	TypeSubmitReady  MessageType = "room.ready"
+	TypeSubmitStart  MessageType = "room.start"
 )
 
 // PromptEnvelope is the canonical live-prompt message family.
@@ -44,15 +35,6 @@ type CommandEnvelopeMessage struct {
 	Payload       map[string]any  `json:"payload"`
 }
 
-// ActionOption is the client-facing description of a legal action choice.
-type ActionOption struct {
-	Label          string `json:"label"`
-	Description    string `json:"description,omitempty"`
-	ID             string `json:"id"`
-	TargetRequired bool   `json:"targetRequired,omitempty"`
-	GuessRequired  bool   `json:"guessRequired,omitempty"`
-}
-
 // ActionPayloadMessage mirrors the action payload sent from the browser.
 type ActionPayloadMessage struct {
 	TargetIndex *int   `json:"targetIndex,omitempty"`
@@ -65,71 +47,6 @@ type ActionMessage struct {
 	ActorIndex int                  `json:"actorIndex"`
 	MainAction string               `json:"mainAction,omitempty"`
 	Payload    ActionPayloadMessage `json:"payload,omitempty"`
-}
-
-// PromptMainActionMessage is sent when the current player must choose a move.
-type PromptMainActionMessage struct {
-	Type        MessageType    `json:"type"`
-	RoomID      string         `json:"roomId"`
-	ActorIndex  int            `json:"actorIndex"`
-	TurnNumber  int            `json:"turnNumber"`
-	Title       string         `json:"title"`
-	Description string         `json:"description,omitempty"`
-	Actions     []ActionOption `json:"actions"`
-}
-
-// PromptChallengeMessage is sent to players who may challenge a claim.
-type PromptChallengeMessage struct {
-	Type               MessageType `json:"type"`
-	RoomID             string      `json:"roomId"`
-	ActorIndex         int         `json:"actorIndex"`
-	Title              string      `json:"title"`
-	Description        string      `json:"description,omitempty"`
-	Action             string      `json:"action"`
-	ActionLabel        string      `json:"actionLabel"`
-	ClaimedRole        string      `json:"claimedRole"`
-	AllowedChallengers []int       `json:"allowedChallengers"`
-}
-
-// PromptCounterMessage is sent to players who may block an action.
-type PromptCounterMessage struct {
-	Type            MessageType    `json:"type"`
-	RoomID          string         `json:"roomId"`
-	Title           string         `json:"title"`
-	Description     string         `json:"description,omitempty"`
-	MainAction      string         `json:"mainAction"`
-	MainActionLabel string         `json:"mainActionLabel"`
-	AllowedPlayers  []int          `json:"allowedPlayers"`
-	AllowedActions  []ActionOption `json:"allowedActions"`
-}
-
-// StepDescriptor explains a follow-up selection that must be completed before
-// a multi-step action can continue.
-type StepDescriptor struct {
-	ActionID string `json:"actionId"`
-	Kind     string `json:"kind"`
-
-	CardSelection *CardSelectionDescriptor `json:"cardSelection,omitempty"`
-}
-
-type CardSelectionDescriptor struct {
-	Count int                 `json:"count"`
-	Cards []CardOptionMessage `json:"cards,omitempty"`
-}
-
-type CardOptionMessage struct {
-	Index int    `json:"index"`
-	Label string `json:"label"`
-}
-
-// PromptStepMessage is sent when the engine pauses for a card or option pick.
-type PromptStepMessage struct {
-	Type        MessageType    `json:"type"`
-	RoomID      string         `json:"roomId"`
-	ActorIndex  int            `json:"actorIndex"`
-	Title       string         `json:"title"`
-	Description string         `json:"description,omitempty"`
-	Step        StepDescriptor `json:"step"`
 }
 
 // MatchSummaryMessage is the public match snapshot shared with every player.
@@ -224,61 +141,6 @@ type GameOverMessage struct {
 	WinnerIndex int                 `json:"winnerIndex"`
 	WinnerName  string              `json:"winnerName"`
 	Summary     MatchSummaryMessage `json:"summary"`
-}
-
-// SubmitActionMessage is the browser payload for a main action submission.
-type SubmitActionMessage struct {
-	Type   MessageType   `json:"type"`
-	RoomID string        `json:"roomId"`
-	Action ActionMessage `json:"action"`
-}
-
-// ChallengeDecisionMessage is the browser payload for a challenge response.
-type ChallengeDecisionMessage struct {
-	ChallengerIndex        int  `json:"challengerIndex"`
-	ChallengerDiscardIndex *int `json:"challengerDiscardIndex,omitempty"`
-	ActorDiscardIndex      *int `json:"actorDiscardIndex,omitempty"`
-	ActorProvingCardIndex  *int `json:"actorProvingCardIndex,omitempty"`
-	Pass                   bool `json:"pass"`
-}
-
-// SubmitChallengeMessage wraps a challenge decision with the room metadata.
-type SubmitChallengeMessage struct {
-	Type     MessageType              `json:"type"`
-	RoomID   string                   `json:"roomId"`
-	Decision ChallengeDecisionMessage `json:"decision"`
-}
-
-// CounterDecisionMessage is the browser payload for a counter response.
-type CounterDecisionMessage struct {
-	PlayerIndex int            `json:"playerIndex"`
-	Pass        bool           `json:"pass"`
-	Command     *ActionMessage `json:"command,omitempty"`
-}
-
-// SubmitCounterMessage wraps a counter decision with the room metadata.
-type SubmitCounterMessage struct {
-	Type     MessageType            `json:"type"`
-	RoomID   string                 `json:"roomId"`
-	Decision CounterDecisionMessage `json:"decision"`
-}
-
-// StepResponseMessage carries the typed response for a step prompt.
-type StepResponseMessage struct {
-	Kind string `json:"kind"`
-
-	CardSelection *CardSelectionResponseMessage `json:"cardSelection,omitempty"`
-}
-
-type CardSelectionResponseMessage struct {
-	SelectedIndices []int `json:"selectedIndices,omitempty"`
-}
-
-// SubmitStepMessage wraps a step response with the room metadata.
-type SubmitStepMessage struct {
-	Type     MessageType         `json:"type"`
-	RoomID   string              `json:"roomId"`
-	Response StepResponseMessage `json:"response"`
 }
 
 // SubmitReadyMessage marks a player as ready in the lobby.

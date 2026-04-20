@@ -1,12 +1,7 @@
 package ws
 
 import (
-	"fmt"
-
 	sessionapp "example.com/elmakina/app/session"
-	corestate "example.com/elmakina/engine/core/state"
-	coretypes "example.com/elmakina/engine/core/types"
-	ports "example.com/elmakina/engine/ports"
 	runtimeturn "example.com/elmakina/engine/runtime/turn"
 	clientprojection "example.com/elmakina/projection/client"
 )
@@ -74,116 +69,6 @@ func BuildGameOverMessage(session *sessionapp.GameSession, winnerIndex int) (Gam
 		WinnerName:  projected.WinnerName,
 		Summary:     matchSummaryFromProjection(projected.Summary),
 	}, nil
-}
-
-func DecodeSubmitAction(message SubmitActionMessage) (*coretypes.PlayerAction, error) {
-	return decodeActionMessage(message.Action)
-}
-
-func DecodeSubmitChallenge(message SubmitChallengeMessage) ports.ChallengeDecision {
-	decision := ports.ChallengeDecision{
-		ChallengerIndex: message.Decision.ChallengerIndex,
-		Pass:            message.Decision.Pass,
-	}
-	if message.Decision.ChallengerDiscardIndex != nil {
-		decision.ChallengerDiscardIndex = *message.Decision.ChallengerDiscardIndex
-	}
-	if message.Decision.ActorDiscardIndex != nil {
-		decision.ActorDiscardIndex = *message.Decision.ActorDiscardIndex
-	}
-	if message.Decision.ActorProvingCardIndex != nil {
-		decision.ActorProvingCardIndex = *message.Decision.ActorProvingCardIndex
-	}
-	return decision
-}
-
-func DecodeSubmitCounter(message SubmitCounterMessage) (ports.CounterDecision, error) {
-	decision := ports.CounterDecision{
-		PlayerIndex: message.Decision.PlayerIndex,
-		Pass:        message.Decision.Pass,
-	}
-	if message.Decision.Pass {
-		return decision, nil
-	}
-	if message.Decision.Command == nil {
-		return ports.CounterDecision{}, fmt.Errorf("counter command is required when pass is false")
-	}
-	command, err := decodeActionMessage(*message.Decision.Command)
-	if err != nil {
-		return ports.CounterDecision{}, err
-	}
-	decision.Command = command
-	return decision, nil
-}
-
-func DecodeSubmitStep(step *corestate.StepRequest, message SubmitStepMessage) (corestate.StepResponse, error) {
-	if step == nil {
-		return corestate.StepResponse{}, fmt.Errorf("step request is nil")
-	}
-
-	response := corestate.StepResponse{Kind: step.Kind}
-	switch step.Kind {
-	case corestate.StepCardSelection:
-		if message.Response.CardSelection == nil {
-			return corestate.StepResponse{}, fmt.Errorf("card selection response is required")
-		}
-		response.CardSelection = &corestate.CardSelectionResponse{
-			SelectedIndices: append([]int(nil), message.Response.CardSelection.SelectedIndices...),
-		}
-	default:
-		return corestate.StepResponse{}, fmt.Errorf("unsupported step kind %q", step.Kind)
-	}
-
-	return response, nil
-}
-
-func decodeActionMessage(message ActionMessage) (*coretypes.PlayerAction, error) {
-	if message.ID == "" {
-		return nil, fmt.Errorf("action id is required")
-	}
-	if actionRequiresTarget(coretypes.ActionID(message.ID)) && message.Payload.TargetIndex == nil {
-		return nil, fmt.Errorf("action %q requires a target", message.ID)
-	}
-	if actionRequiresGuess(coretypes.ActionID(message.ID)) && message.Payload.Guess == "" {
-		return nil, fmt.Errorf("action %q requires a guess", message.ID)
-	}
-
-	action := &coretypes.PlayerAction{
-		ID:         coretypes.ActionID(message.ID),
-		ActorIndex: message.ActorIndex,
-		MainAction: coretypes.ActionID(message.MainAction),
-	}
-
-	if message.Payload.TargetIndex != nil && message.Payload.Guess != "" {
-		role, err := coretypes.ParseRole(message.Payload.Guess)
-		if err != nil {
-			return nil, err
-		}
-		action.Payload = coretypes.AccusePayload{
-			TargetIndex: *message.Payload.TargetIndex,
-			Guess:       role,
-		}
-		return action, nil
-	}
-	if message.Payload.TargetIndex != nil {
-		action.Payload = coretypes.TargetPayload{TargetIndex: *message.Payload.TargetIndex}
-		return action, nil
-	}
-	action.Payload = coretypes.NoPayload{}
-	return action, nil
-}
-
-func actionRequiresTarget(id coretypes.ActionID) bool {
-	switch id {
-	case coretypes.Coup, coretypes.Investigate, coretypes.Assassinate, coretypes.Steal, coretypes.Accuse:
-		return true
-	default:
-		return false
-	}
-}
-
-func actionRequiresGuess(id coretypes.ActionID) bool {
-	return id == coretypes.Accuse
 }
 
 func buildMatchSummaryMessage(session *sessionapp.GameSession) MatchSummaryMessage {

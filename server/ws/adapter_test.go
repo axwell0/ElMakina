@@ -35,6 +35,25 @@ func TestBuildPromptEnvelopeUsesSessionInteractionState(t *testing.T) {
 	require.Equal(t, "challenge", envelope.Interaction.Kind)
 }
 
+func TestPromptPathNoLongerDependsOnProjectionClient(t *testing.T) {
+	interaction := &sessionapp.InteractionState{
+		ID:   "ix-1",
+		Kind: sessionapp.InteractionMainAction,
+		Recipients: sessionapp.RecipientSet{
+			Players: []int{0},
+		},
+		Payload: sessionapp.MainActionInteraction{
+			ActorIndex: 0,
+			TurnNumber: 1,
+			Title:      "Choose",
+		},
+	}
+
+	envelope, err := BuildPromptEnvelope(interaction)
+	require.NoError(t, err)
+	require.Equal(t, "main_action", envelope.Interaction.Kind)
+}
+
 func TestBuildTurnResultMessageIncludesViewerPrivateData(t *testing.T) {
 	session := newTestSession(t)
 	session.State.TurnNumber = 4
@@ -84,117 +103,6 @@ func TestBuildRoomSyncMessageIncludesLeaderAndLifecycleFlags(t *testing.T) {
 	require.True(t, message.Room.CanDelete)
 }
 
-func TestDecodeSubmitMessages(t *testing.T) {
-	targetIndex := 1
-	command, err := DecodeSubmitAction(SubmitActionMessage{
-		Type:   TypeSubmitAction,
-		RoomID: "room-1",
-		Action: ActionMessage{
-			ID:         string(coretypes.Accuse),
-			ActorIndex: 0,
-			Payload: ActionPayloadMessage{
-				TargetIndex: &targetIndex,
-				Guess:       string(coretypes.Thief),
-			},
-		},
-	})
-	require.NoError(t, err)
-	require.Equal(t, coretypes.Accuse, command.ID)
-
-	accuse, ok := command.Payload.(coretypes.AccusePayload)
-	require.True(t, ok)
-	require.Equal(t, 1, accuse.TargetIndex)
-	require.Equal(t, coretypes.Thief, accuse.Guess)
-
-	counter, err := DecodeSubmitCounter(SubmitCounterMessage{
-		Type:   TypeSubmitCounter,
-		RoomID: "room-1",
-		Decision: CounterDecisionMessage{
-			PlayerIndex: 1,
-			Command: &ActionMessage{
-				ID:         string(coretypes.BlockSteal),
-				ActorIndex: 1,
-				MainAction: string(coretypes.Steal),
-			},
-		},
-	})
-	require.NoError(t, err)
-	require.False(t, counter.Pass)
-	require.NotNil(t, counter.Command)
-	require.Equal(t, coretypes.BlockSteal, counter.Command.ID)
-
-	challenge := DecodeSubmitChallenge(SubmitChallengeMessage{
-		Type:   TypeSubmitChallenge,
-		RoomID: "room-1",
-		Decision: ChallengeDecisionMessage{
-			ChallengerIndex:        1,
-			ActorDiscardIndex:      intPtr(0),
-			ActorProvingCardIndex:  intPtr(1),
-			ChallengerDiscardIndex: intPtr(0),
-		},
-	})
-	require.Equal(t, 1, challenge.ChallengerIndex)
-
-	step, err := DecodeSubmitStep(&corestate.StepRequest{
-		ActionID: coretypes.Exchange,
-		Actor:    0,
-		Kind:     corestate.StepCardSelection,
-		CardSelection: &corestate.CardSelectionStep{
-			Count: 2,
-		},
-	}, SubmitStepMessage{
-		Type:   TypeSubmitStep,
-		RoomID: "room-1",
-		Response: StepResponseMessage{
-			Kind: string(corestate.StepCardSelection),
-			CardSelection: &CardSelectionResponseMessage{
-				SelectedIndices: []int{0, 2},
-			},
-		},
-	})
-	require.NoError(t, err)
-	require.NotNil(t, step.CardSelection)
-	require.Equal(t, []int{0, 2}, step.CardSelection.SelectedIndices)
-}
-
-func TestDecodeSubmitActionRejectsMalformedTargetPayloads(t *testing.T) {
-	_, err := DecodeSubmitAction(SubmitActionMessage{
-		Type:   TypeSubmitAction,
-		RoomID: "room-1",
-		Action: ActionMessage{
-			ID:         string(coretypes.Investigate),
-			ActorIndex: 0,
-		},
-	})
-	require.EqualError(t, err, `action "investigate" requires a target`)
-
-	targetIndex := 1
-	_, err = DecodeSubmitAction(SubmitActionMessage{
-		Type:   TypeSubmitAction,
-		RoomID: "room-1",
-		Action: ActionMessage{
-			ID:         string(coretypes.Accuse),
-			ActorIndex: 0,
-			Payload: ActionPayloadMessage{
-				TargetIndex: &targetIndex,
-			},
-		},
-	})
-	require.EqualError(t, err, `action "accuse" requires a guess`)
-}
-
-func TestDecodeSubmitCounterRejectsMissingCommandWhenPassingFalse(t *testing.T) {
-	_, err := DecodeSubmitCounter(SubmitCounterMessage{
-		Type:   TypeSubmitCounter,
-		RoomID: "room-1",
-		Decision: CounterDecisionMessage{
-			PlayerIndex: 1,
-			Pass:        false,
-		},
-	})
-	require.EqualError(t, err, "counter command is required when pass is false")
-}
-
 func newTestSession(t *testing.T) *sessionapp.GameSession {
 	t.Helper()
 
@@ -218,8 +126,4 @@ func buildLobbyRoomSyncMessage(t *testing.T, mutate func(*sessionapp.GameSession
 	message, err := BuildRoomSyncMessage(session, 0)
 	require.NoError(t, err)
 	return session, message
-}
-
-func intPtr(value int) *int {
-	return &value
 }
