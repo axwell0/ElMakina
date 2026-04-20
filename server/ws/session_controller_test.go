@@ -111,6 +111,30 @@ func TestRoomRejectsCommandForWrongInteractionRecipient(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestRoomRuntimeSendsPromptOnlyToInteractionRecipients(t *testing.T) {
+	room, clients := newTestRoom(t)
+
+	interaction := &sessionapp.InteractionState{
+		ID:   "ix-1",
+		Kind: sessionapp.InteractionChallenge,
+		Recipients: sessionapp.RecipientSet{
+			Players: []int{1},
+		},
+		Payload: sessionapp.ChallengeInteraction{
+			ActorIndex:  0,
+			Action:      "assassinate",
+			ClaimedRole: "Colonel",
+		},
+	}
+
+	err := room.runtime.dispatchInteraction(interaction)
+	require.NoError(t, err)
+
+	_, ok := clients[1].awaitMessage(t).(PromptEnvelope)
+	require.True(t, ok)
+	clients[0].assertNoMessage(t)
+}
+
 func newTestRoom(t *testing.T) (*Room, []*stubClient) {
 	t.Helper()
 

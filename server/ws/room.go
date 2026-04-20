@@ -22,6 +22,8 @@ type Room struct {
 	connections *ConnectionRegistry
 	logger     *slog.Logger
 	turnConfig ports.TurnConfig
+	runtime    *roomRuntime
+	socket     *roomSocket
 
 	mu          sync.Mutex
 	loopRunning bool
@@ -34,12 +36,15 @@ func newRoom(session *sessionapp.GameSession, cfg ports.TurnConfig, logger *slog
 	if logger == nil {
 		logger = slog.Default()
 	}
-	return &Room{
+	room := &Room{
 		session:    session,
 		connections: NewConnectionRegistry(),
 		logger:     logger,
 		turnConfig: cfg,
-	}, nil
+	}
+	room.runtime = &roomRuntime{room: room}
+	room.socket = newRoomSocket(room)
+	return room, nil
 }
 
 // startGameLoop starts the turn loop once the room is ready.
@@ -678,17 +683,7 @@ func (r *Room) sendPromptToRelevantPlayers() error {
 	if interaction == nil {
 		return nil
 	}
-
-	message, err := BuildPromptEnvelope(interaction)
-	if err != nil {
-		return err
-	}
-	for _, playerIndex := range interaction.Recipients.Players {
-		if _, err := r.SendToPlayerIfConnected(playerIndex, message); err != nil {
-			return err
-		}
-	}
-	return nil
+	return r.runtime.dispatchInteraction(interaction)
 }
 
 type turnOutcome struct {
