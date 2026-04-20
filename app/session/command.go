@@ -10,33 +10,34 @@ const (
 )
 
 type CommandEnvelope struct {
-	InteractionID string
-	Kind          CommandKind
-	SessionID     string
-	Payload       any
+	InteractionID string      `json:"interactionId"`
+	Kind          CommandKind `json:"kind"`
+	SessionID     string      `json:"sessionId"`
+	Payload       any         `json:"payload"`
 }
 
 type MainActionCommand struct {
-	ActionID    string
-	ActorIndex  int
-	TargetIndex *int
-	Guess       string
+	ActionID    string `json:"actionId"`
+	ActorIndex  int    `json:"actorIndex"`
+	MainAction  string `json:"mainAction,omitempty"`
+	TargetIndex *int   `json:"targetIndex,omitempty"`
+	Guess       string `json:"guess,omitempty"`
 }
 
 type ChallengeDecisionCommand struct {
-	ChallengerIndex        int
-	ChallengerDiscardIndex *int
-	ActorDiscardIndex      *int
-	ActorProvingCardIndex  *int
-	Pass                   bool
+	ChallengerIndex        int  `json:"challengerIndex"`
+	ChallengerDiscardIndex *int `json:"challengerDiscardIndex,omitempty"`
+	ActorDiscardIndex      *int `json:"actorDiscardIndex,omitempty"`
+	ActorProvingCardIndex  *int `json:"actorProvingCardIndex,omitempty"`
+	Pass                   bool `json:"pass"`
 }
 
 type CounterDecisionCommand struct {
-	PlayerIndex int
-	Pass        bool
-	Command     *MainActionCommand
+	PlayerIndex int                `json:"playerIndex"`
+	Pass        bool               `json:"pass"`
+	Command     *MainActionCommand `json:"command,omitempty"`
 }
 
 type CardSelectionCommand struct {
-	SelectedIndices []int
+	SelectedIndices []int `json:"selectedIndices"`
 }

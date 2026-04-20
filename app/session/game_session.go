@@ -916,6 +916,7 @@ func actionFromMainActionCommand(command MainActionCommand) (*coretypes.PlayerAc
 	action := &coretypes.PlayerAction{
 		ID:         coretypes.ActionID(command.ActionID),
 		ActorIndex: command.ActorIndex,
+		MainAction: coretypes.ActionID(command.MainAction),
 	}
 	if command.TargetIndex != nil && command.Guess != "" {
 		role, err := coretypes.ParseRole(command.Guess)

@@ -1,0 +1,1265 @@
+<!doctype html>
+<!-- File: server/ws/playground.html -->
+<!-- Purpose: Handles the websocket transport for the local demo client. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>El Makina Local Demo</title>
+  <style>
+    :root {
+      --bg: #f4efe6;
+      --panel: #fffaf2;
+      --ink: #1d1a17;
+      --muted: #6f665c;
+      --accent: #b2452f;
+      --accent-soft: #ead1b7;
+      --line: #d8c8b2;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, #fff7e7, transparent 30%),
+        linear-gradient(180deg, #f8f2e9 0%, var(--bg) 100%);
+      min-height: 100vh;
+    }
+    main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    h1, h2, h3 { margin: 0 0 12px; }
+    p { margin: 0 0 12px; color: var(--muted); }
+    .grid {
+      display: grid;
+      gap: 18px;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    }
+    .panel {
+      background: color-mix(in srgb, var(--panel) 92%, white 8%);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 18px;
+      box-shadow: 0 12px 30px rgba(93, 66, 38, 0.08);
+    }
+    label, input, select, button, textarea {
+      font: inherit;
+    }
+    input, select, textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: white;
+      margin-bottom: 10px;
+    }
+    button {
+      border: 0;
+      border-radius: 999px;
+      padding: 10px 14px;
+      background: var(--accent);
+      color: white;
+      cursor: pointer;
+      margin: 4px 6px 4px 0;
+    }
+    button.secondary {
+      background: var(--accent-soft);
+      color: var(--ink);
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .pill {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--ink);
+      margin-right: 6px;
+      margin-bottom: 6px;
+    }
+    .players {
+      display: grid;
+      gap: 10px;
+    }
+    .player {
+      padding: 12px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.7);
+    }
+    .player.current {
+      border-color: var(--accent);
+      background: #fff1e6;
+    }
+    .cards {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .log {
+      max-height: 320px;
+      overflow: auto;
+      font-size: 14px;
+      line-height: 1.45;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px;
+    }
+    .log-entry {
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: #fff9f1;
+      border: 1px solid color-mix(in srgb, var(--line) 75%, white 25%);
+    }
+    .log-entry + .log-entry {
+      margin-top: 8px;
+    }
+    .log-entry.private {
+      background: #fff1e6;
+      border-color: color-mix(in srgb, var(--accent-soft) 70%, var(--accent) 30%);
+    }
+    .hidden { display: none; }
+    .status {
+      font-size: 14px;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .status-grid {
+      display: grid;
+      gap: 8px;
+    }
+    .status-card {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: rgba(255,255,255,0.75);
+    }
+    .status-card strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+    .prompt-state {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(255,247,235,0.96));
+      margin-bottom: 12px;
+    }
+    .prompt-state h3 {
+      margin-bottom: 8px;
+    }
+    .prompt-state p:last-child {
+      margin-bottom: 0;
+    }
+    .action-list {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .action-card {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px;
+      background: rgba(255,255,255,0.78);
+    }
+    .action-card strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+    .action-card p {
+      margin-bottom: 0;
+    }
+    .resume-card {
+      margin-top: 18px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px;
+      background: linear-gradient(180deg, #fff7ec, #fffdf9);
+    }
+    .resume-card h2 {
+      margin-bottom: 8px;
+    }
+    a.demo-link {
+      display: block;
+      margin-top: 8px;
+      color: var(--accent);
+    }
+  </style>
+</head>
+<body>
+<main>
+  <div class="panel" id="lobbyPanel">
+    <h1>El Makina Local Demo</h1>
+    <p>Create a lobby with a shareable room code, or join an existing room with your own player name.</p>
+    <div class="grid">
+      <div>
+        <h2>Create Room</h2>
+        <input id="createLeaderName" placeholder="Your name" value="A">
+        <select id="createPlayerCount">
+          <option value="2">2 players</option>
+          <option value="3">3 players</option>
+          <option value="4">4 players</option>
+          <option value="5">5 players</option>
+          <option value="6">6 players</option>
+          <option value="7">7 players</option>
+          <option value="8">8 players</option>
+          <option value="9">9 players</option>
+        </select>
+        <button id="createRoomButton">Create Room</button>
+      </div>
+      <div>
+        <h2>Join Room</h2>
+        <input id="joinRoomCode" placeholder="Room code">
+        <input id="joinPlayerName" placeholder="Your name">
+        <button id="joinRoomButton">Join Room</button>
+      </div>
+    </div>
+    <div style="margin-top: 20px;">
+      <h2>Existing Rooms</h2>
+      <p>Open a room join page directly if you want to test the lobby from multiple browsers.</p>
+      <button id="refreshRoomsButton" class="secondary">Refresh Rooms</button>
+      <div id="roomList" style="margin-top: 12px;"></div>
+    </div>
+    <div id="resumePrompt" class="resume-card hidden">
+      <h2 id="resumePromptTitle">Resume your game?</h2>
+      <p id="resumePromptBody">We found a game from this browser.</p>
+      <button id="resumePromptButton">Resume Game</button>
+      <button id="dismissResumePromptButton" class="secondary">Dismiss</button>
+    </div>
+  </div>
+
+  <div id="gamePanel" class="hidden">
+    <div class="grid">
+      <section class="panel">
+        <h2 id="identityTitle">Player</h2>
+        <div class="status" id="connectionStatus">Connecting...</div>
+        <div id="roomMeta"></div>
+        <h3>Your Hand</h3>
+        <div class="cards" id="handCards"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Table</h2>
+        <div id="playerSummaries" class="players"></div>
+      </section>
+    </div>
+
+    <div class="grid" style="margin-top: 18px;">
+      <section class="panel">
+        <h2>Prompt</h2>
+        <div id="promptArea">
+          <p>Waiting for the game to start.</p>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Log</h2>
+        <div id="logArea" class="log"></div>
+      </section>
+    </div>
+  </div>
+</main>
+
+<script>
+(() => {
+  const DEVICE_ID_KEY = "elmakina.deviceId";
+  const SESSION_STORE_KEY = "elmakina.sessions";
+  const roles = ["Businesswoman", "TaxCollector", "Policewoman", "Colonel", "Terrorist", "Thief", "Politician"];
+  // Manual verification target:
+  // 1. First load creates a device ID in localStorage.
+  // 2. Returning load calls /api/me/resumable-games with that device ID.
+  // 3. Matching sessions render a resume prompt instead of auto-resuming.
+  const state = {
+    deviceId: ensureDeviceId(),
+    savedSessions: loadStoredSessions(),
+    resumableGames: [],
+    resumePromptVisible: false,
+    roomId: null,
+    roomCode: "",
+    joinUrl: "",
+    playerIndex: null,
+    playerName: "",
+    sessionId: "",
+    resumeToken: "",
+    socket: null,
+    room: null,
+    summary: null,
+    hand: [],
+    connectedPlayers: [],
+    currentPrompt: null,
+    statusTitle: "",
+    statusDescription: "",
+    lastRoomLog: "",
+    reconnectTimer: null,
+    manualDisconnect: false,
+  };
+
+  const params = new URLSearchParams(window.location.search);
+  const roomIdParam = params.get("roomId");
+
+  const lobbyPanel = document.getElementById("lobbyPanel");
+  const gamePanel = document.getElementById("gamePanel");
+  const createRoomButton = document.getElementById("createRoomButton");
+  const joinRoomButton = document.getElementById("joinRoomButton");
+  const refreshRoomsButton = document.getElementById("refreshRoomsButton");
+  const roomList = document.getElementById("roomList");
+  const resumePrompt = document.getElementById("resumePrompt");
+  const resumePromptTitle = document.getElementById("resumePromptTitle");
+  const resumePromptBody = document.getElementById("resumePromptBody");
+  const resumePromptButton = document.getElementById("resumePromptButton");
+  const dismissResumePromptButton = document.getElementById("dismissResumePromptButton");
+  const logArea = document.getElementById("logArea");
+  const promptArea = document.getElementById("promptArea");
+  const connectionStatus = document.getElementById("connectionStatus");
+  const identityTitle = document.getElementById("identityTitle");
+  const roomMeta = document.getElementById("roomMeta");
+  const handCards = document.getElementById("handCards");
+  const playerSummaries = document.getElementById("playerSummaries");
+  const createLeaderName = document.getElementById("createLeaderName");
+  const createPlayerCount = document.getElementById("createPlayerCount");
+  const joinPlayerName = document.getElementById("joinPlayerName");
+  const joinRoomCode = document.getElementById("joinRoomCode");
+
+  function ensureDeviceId() {
+    let deviceId = localStorage.getItem(DEVICE_ID_KEY);
+    if (!deviceId) {
+      deviceId = crypto.randomUUID();
+      localStorage.setItem(DEVICE_ID_KEY, deviceId);
+    }
+    return deviceId;
+  }
+
+  function loadStoredSessions() {
+    try {
+      const raw = localStorage.getItem(SESSION_STORE_KEY);
+      if (!raw) {
+        return {};
+      }
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch (error) {
+      console.warn("failed to load session store", error);
+      return {};
+    }
+  }
+
+  function persistStoredSessions() {
+    localStorage.setItem(SESSION_STORE_KEY, JSON.stringify(state.savedSessions));
+  }
+
+  function storeJoinedSession(joined) {
+    state.savedSessions[joined.sessionId] = {
+      roomId: joined.roomId,
+      roomCode: joined.roomCode || joined.roomId,
+      joinUrl: joined.joinUrl || `${window.location.origin}/play?roomId=${encodeURIComponent(joined.roomId)}`,
+      sessionId: joined.sessionId,
+      resumeToken: joined.resumeToken,
+      playerIndex: joined.playerIndex,
+      playerName: joined.playerName,
+    };
+    persistStoredSessions();
+  }
+
+  function storedSessionForGame(game) {
+    if (!game || !game.sessionId) {
+      return null;
+    }
+    return state.savedSessions[game.sessionId] || null;
+  }
+
+  function renderResumePrompt() {
+    if (!state.resumePromptVisible || state.resumableGames.length === 0) {
+      resumePrompt.classList.add("hidden");
+      return;
+    }
+
+    const game = state.resumableGames[0];
+    const storedSession = storedSessionForGame(game);
+    resumePrompt.classList.remove("hidden");
+    resumePromptTitle.textContent = "Resume your game?";
+    resumePromptBody.textContent = `Room ${game.roomCode} as ${game.playerName} (${game.connected ? "currently connected" : "disconnected"}).`;
+    resumePromptButton.disabled = !storedSession;
+    resumePromptButton.textContent = storedSession ? "Resume Game" : "Missing local session";
+  }
+
+  function clearNode(node) {
+    node.replaceChildren();
+  }
+
+  function appendParagraph(container, text, className = "") {
+    const paragraph = document.createElement("p");
+    if (className) {
+      paragraph.className = className;
+    }
+    paragraph.textContent = text;
+    container.appendChild(paragraph);
+    return paragraph;
+  }
+
+  function logLine(line, tone = "public") {
+    const entry = document.createElement("div");
+    entry.className = `log-entry${tone === "private" ? " private" : ""}`;
+    entry.textContent = line;
+    logArea.appendChild(entry);
+    logArea.scrollTop = logArea.scrollHeight;
+  }
+
+  function setConnectionStatus(text) {
+    connectionStatus.textContent = text;
+  }
+
+  function renderHand() {
+    clearNode(handCards);
+    if (!state.hand.length) {
+      const empty = document.createElement("span");
+      empty.className = "pill";
+      empty.textContent = "No cards";
+      handCards.appendChild(empty);
+      return;
+    }
+    state.hand.forEach((card, index) => {
+      const span = document.createElement("span");
+      span.className = "pill";
+      span.textContent = `${index}: ${card.role}`;
+      handCards.appendChild(span);
+    });
+  }
+
+  function playerNameByIndex(playerIndex) {
+    if (!state.summary) return `player ${playerIndex}`;
+    const player = state.summary.players.find((item) => item.playerIndex === playerIndex);
+    return player ? player.name : `player ${playerIndex}`;
+  }
+
+  function describePlayers(indices) {
+    if (!indices || !indices.length) return "none";
+    return indices.map((playerIndex) => playerNameByIndex(playerIndex)).join(", ");
+  }
+
+  function phaseLabel(phase) {
+    if (phase === "lobby") return "Lobby";
+    if (phase === "in_turn") return "Match live";
+    if (phase === "game_over") return "Match finished";
+    return "Waiting";
+  }
+
+  function roomLogLine() {
+    if (!state.room || !state.summary) return "";
+    const leader = playerNameByIndex(state.room.leaderPlayerIndex);
+    if (state.room.phase === "lobby") {
+      return `Lobby update: ${state.room.joinedPlayers} of ${state.room.playerCount} joined, ${state.room.readyPlayers.length} ready (${describePlayers(state.room.readyPlayers)}). Leader: ${leader}.`;
+    }
+    if (state.room.phase === "game_over") {
+      return `Match finished: waiting on ${leader} to restart or close the room.`;
+    }
+    const activePlayer = playerNameByIndex(state.summary.currentPlayerIndex);
+    return `Match live: turn ${state.summary.turnNumber}, waiting on ${activePlayer}.`;
+  }
+
+  function promptLogLine(prompt) {
+    if (!prompt) return "";
+    if (prompt.title) return prompt.title;
+    if (prompt.kind === "challenge") return `Challenge window for ${prompt.payload.actionLabel || prompt.payload.action}`;
+    if (prompt.kind === "counter") return `Counter window for ${prompt.payload.mainActionLabel || prompt.payload.mainAction}`;
+    if (prompt.kind === "card_selection") return "Resolve effect";
+    return "Prompt update";
+  }
+
+  function renderSummary() {
+    clearNode(roomMeta);
+    if (!state.summary) return;
+
+    const room = state.room || { phase: "lobby", readyPlayers: [], canStart: false, leaderPlayerIndex: 0, playerCount: state.summary.players.length, joinedPlayers: 0 };
+    const readyPlayers = room.readyPlayers || [];
+    const isLeader = room.leaderPlayerIndex === state.playerIndex;
+
+    if (state.roomId) {
+      const shareCard = document.createElement("div");
+      shareCard.className = "status-card";
+      const strong = document.createElement("strong");
+      strong.textContent = "Share";
+      const code = document.createElement("div");
+      code.textContent = `Code: ${state.roomCode || state.roomId}`;
+      const link = document.createElement("a");
+      link.className = "demo-link";
+      link.href = state.joinUrl || `${window.location.origin}/play?roomId=${encodeURIComponent(state.roomId)}`;
+      link.textContent = state.joinUrl || link.href;
+      const copyCode = document.createElement("button");
+      copyCode.className = "secondary";
+      copyCode.textContent = "Copy Code";
+      copyCode.onclick = async () => copyText(state.roomCode || state.roomId, "Room code copied.");
+      const copyLink = document.createElement("button");
+      copyLink.className = "secondary";
+      copyLink.textContent = "Copy Link";
+      copyLink.onclick = async () => copyText(state.joinUrl || link.href, "Join link copied.");
+      shareCard.appendChild(strong);
+      shareCard.appendChild(code);
+      shareCard.appendChild(link);
+      shareCard.appendChild(copyCode);
+      shareCard.appendChild(copyLink);
+      roomMeta.appendChild(shareCard);
+    }
+
+    const statusGrid = document.createElement("div");
+    statusGrid.className = "status-grid";
+    [
+      { title: "Room", value: state.roomCode || state.roomId },
+      { title: "Phase", value: phaseLabel(room.phase) },
+      { title: "Leader", value: `${playerNameByIndex(room.leaderPlayerIndex)}${isLeader ? " (you)" : ""}` },
+      { title: "Turn", value: String(state.summary.turnNumber) },
+      { title: "Players", value: `${room.joinedPlayers} of ${room.playerCount} joined` },
+      { title: "Connected", value: `${state.connectedPlayers.length} of ${state.summary.players.length}: ${describePlayers(state.connectedPlayers)}` },
+      { title: "Ready", value: `${readyPlayers.length} of ${state.summary.players.length}: ${describePlayers(readyPlayers)}` },
+    ].forEach((item) => {
+      const card = document.createElement("div");
+      card.className = "status-card";
+      const strong = document.createElement("strong");
+      strong.textContent = item.title;
+      const span = document.createElement("span");
+      span.textContent = item.value;
+      card.appendChild(strong);
+      card.appendChild(span);
+      statusGrid.appendChild(card);
+    });
+    roomMeta.appendChild(statusGrid);
+
+    clearNode(playerSummaries);
+    state.summary.players.forEach((player) => {
+      const div = document.createElement("div");
+      div.className = "player" + (player.playerIndex === state.summary.currentPlayerIndex ? " current" : "");
+      const connected = state.connectedPlayers.includes(player.playerIndex) ? "connected" : "waiting";
+      const leader = room.leaderPlayerIndex === player.playerIndex ? " - leader" : "";
+      const strong = document.createElement("strong");
+      strong.textContent = `${player.name}${leader}`;
+      div.appendChild(strong);
+      div.appendChild(document.createElement("br"));
+      div.appendChild(document.createTextNode(`Coins: ${player.coins}`));
+      div.appendChild(document.createElement("br"));
+      div.appendChild(document.createTextNode(`Cards: ${player.cards}`));
+      div.appendChild(document.createElement("br"));
+      div.appendChild(document.createTextNode(`Status: ${player.eliminated ? "eliminated" : connected}`));
+      playerSummaries.appendChild(div);
+    });
+  }
+
+  function renderPrompt(interaction) {
+    state.currentPrompt = interaction;
+    clearNode(promptArea);
+
+    if (!interaction) {
+      renderRoomPhasePrompt();
+      return;
+    }
+
+    if (interaction.kind === "main_action") {
+      renderMainActionPrompt(interaction);
+      return;
+    }
+    if (interaction.kind === "challenge") {
+      renderChallengePrompt(interaction);
+      return;
+    }
+    if (interaction.kind === "counter") {
+      renderCounterPrompt(interaction);
+      return;
+    }
+    if (interaction.kind === "card_selection") {
+      renderCardSelectionPrompt(interaction);
+      return;
+    }
+
+    appendParagraph(promptArea, `Unsupported interaction ${interaction.kind}`);
+  }
+
+  function appendPromptState(title, description) {
+    const shell = document.createElement("div");
+    shell.className = "prompt-state";
+
+    if (title) {
+      const heading = document.createElement("h3");
+      heading.textContent = title;
+      shell.appendChild(heading);
+    }
+
+    if (description) {
+      const copy = document.createElement("p");
+      copy.textContent = description;
+      shell.appendChild(copy);
+    }
+
+    promptArea.appendChild(shell);
+    return shell;
+  }
+
+  function sendReady() {
+    state.socket.send(JSON.stringify({
+      type: "room.ready",
+      roomId: state.roomId,
+    }));
+    renderPrompt(null);
+  }
+
+  function sendStart() {
+    state.socket.send(JSON.stringify({
+      type: "room.start",
+      roomId: state.roomId,
+    }));
+    renderPrompt(null);
+  }
+
+  async function restartRoom() {
+    const response = await fetch(`/api/rooms/${encodeURIComponent(state.roomId)}/restart`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${state.resumeToken}`,
+      },
+      body: JSON.stringify({ sessionId: state.sessionId }),
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      alert(result.error || "Failed to restart room.");
+      return;
+    }
+    state.room = result.room;
+    state.summary = result.summary;
+    state.currentPrompt = null;
+    renderSummary();
+    renderPrompt(null);
+    logLine("Room restarted by the lobby leader.");
+  }
+
+  async function deleteRoom() {
+    const response = await fetch(`/api/rooms/${encodeURIComponent(state.roomId)}?sessionId=${encodeURIComponent(state.sessionId)}`, {
+      method: "DELETE",
+      headers: {
+        "Authorization": `Bearer ${state.resumeToken}`,
+      },
+    });
+    if (!response.ok) {
+      let message = "Failed to delete room.";
+      try {
+        const result = await response.json();
+        message = result.error || message;
+      } catch (error) {
+        console.warn(error);
+      }
+      alert(message);
+      return;
+    }
+    state.manualDisconnect = true;
+    if (state.socket) {
+      state.socket.close();
+    }
+    window.location.href = "/";
+  }
+
+  function scheduleReconnect() {
+    if (state.manualDisconnect || !state.sessionId || state.reconnectTimer) {
+      return;
+    }
+    setConnectionStatus("Reconnecting...");
+    state.reconnectTimer = window.setTimeout(() => {
+      state.reconnectTimer = null;
+      connectSocket({
+        roomId: state.roomId,
+        playerIndex: state.playerIndex,
+        playerName: state.playerName,
+        sessionId: state.sessionId,
+        resumeToken: state.resumeToken,
+        resumed: true,
+      });
+    }, 1000);
+  }
+
+  function renderRoomPhasePrompt() {
+    const room = state.room || {};
+    const readyPlayers = room.readyPlayers || [];
+    const isReady = readyPlayers.includes(state.playerIndex);
+    const isLeader = room.leaderPlayerIndex === state.playerIndex;
+    const statusTitle = state.statusTitle || "Stand by";
+    const statusDescription = state.statusDescription || "Waiting for the room to update.";
+
+    if (room.phase === "lobby") {
+      appendPromptState(statusTitle, statusDescription);
+
+      const readyButton = document.createElement("button");
+      readyButton.textContent = isReady ? "Ready" : "Mark Ready";
+      readyButton.disabled = isReady;
+      readyButton.onclick = sendReady;
+      promptArea.appendChild(readyButton);
+
+      if (room.canStart && isLeader) {
+        const startButton = document.createElement("button");
+        startButton.textContent = "Start Game";
+        startButton.onclick = sendStart;
+        promptArea.appendChild(startButton);
+      }
+
+      if (room.canRestart && isLeader) {
+        const restartButton = document.createElement("button");
+        restartButton.className = "secondary";
+        restartButton.textContent = "Reset Lobby";
+        restartButton.onclick = restartRoom;
+        promptArea.appendChild(restartButton);
+      }
+
+      if (room.canDelete && isLeader) {
+        const deleteButton = document.createElement("button");
+        deleteButton.className = "secondary";
+        deleteButton.textContent = "Delete Room";
+        deleteButton.onclick = deleteRoom;
+        promptArea.appendChild(deleteButton);
+      }
+      return;
+    }
+
+    if (room.phase === "game_over") {
+      appendPromptState(statusTitle, statusDescription);
+      if (room.canRestart && isLeader) {
+        const restartButton = document.createElement("button");
+        restartButton.textContent = "Restart Match";
+        restartButton.onclick = restartRoom;
+        promptArea.appendChild(restartButton);
+      }
+      if (room.canDelete && isLeader) {
+        const deleteButton = document.createElement("button");
+        deleteButton.className = "secondary";
+        deleteButton.textContent = "Delete Room";
+        deleteButton.onclick = deleteRoom;
+        promptArea.appendChild(deleteButton);
+      }
+      return;
+    }
+
+    appendPromptState(statusTitle, statusDescription);
+  }
+
+  function gameOverStatusCopy(winnerName) {
+    const isLeader = state.room && state.room.leaderPlayerIndex === state.playerIndex;
+    const title = `Match finished${winnerName ? `: ${winnerName} wins` : ""}`;
+    if (isLeader) {
+      return {
+        title,
+        description: "You can restart the match for this room or delete it and close the lobby.",
+      };
+    }
+    return {
+      title,
+      description: "Waiting for the lobby leader to restart the match or close the room.",
+    };
+  }
+
+  function targetOptions() {
+    if (!state.summary) return [];
+    return state.summary.players.filter((player) => player.playerIndex !== state.playerIndex && !player.eliminated);
+  }
+
+  function renderMainActionPrompt(interaction) {
+    const prompt = interaction.payload || {};
+    const actions = Array.isArray(prompt.actions) ? prompt.actions : [];
+    const targetChoices = targetOptions();
+    appendPromptState(prompt.title, prompt.description);
+
+    const actionList = document.createElement("div");
+    actionList.className = "action-list";
+    actions.forEach((action) => {
+      const card = document.createElement("div");
+      card.className = "action-card";
+      const title = document.createElement("strong");
+      title.textContent = action.label || action.id;
+      const description = document.createElement("p");
+      description.textContent = action.description || "No action description available.";
+      card.appendChild(title);
+      card.appendChild(description);
+      actionList.appendChild(card);
+    });
+    promptArea.appendChild(actionList);
+
+    const actionSelect = document.createElement("select");
+    actions.forEach((action) => {
+      const option = document.createElement("option");
+      option.value = action.id;
+      option.textContent = action.label || action.id;
+      option.dataset.targetRequired = action.targetRequired ? "true" : "";
+      option.dataset.guessRequired = action.guessRequired ? "true" : "";
+      actionSelect.appendChild(option);
+    });
+
+    const targetSelect = document.createElement("select");
+    targetChoices.forEach((player) => {
+      const option = document.createElement("option");
+      option.value = player.playerIndex;
+      option.textContent = `${player.playerIndex}: ${player.name}`;
+      targetSelect.appendChild(option);
+    });
+
+    const guessSelect = document.createElement("select");
+    roles.forEach((role) => {
+      const option = document.createElement("option");
+      option.value = role;
+      option.textContent = role;
+      guessSelect.appendChild(option);
+    });
+
+    const submitButton = document.createElement("button");
+    submitButton.textContent = "Submit action";
+    submitButton.onclick = async () => {
+      const command = {
+        type: "command",
+        interactionId: interaction.id,
+        kind: "main_action",
+        payload: {
+          actionId: actionSelect.value,
+          actorIndex: state.playerIndex,
+        },
+      };
+      const selected = actions.find((item) => item.id === actionSelect.value);
+      if (selected && selected.targetRequired && targetSelect.value === "") {
+        alert("This action needs a target.");
+        return;
+      }
+      if (selected && selected.targetRequired) {
+        command.payload.targetIndex = Number(targetSelect.value);
+      }
+      if (selected && selected.guessRequired) {
+        command.payload.guess = guessSelect.value;
+      }
+      state.socket.send(JSON.stringify(command));
+      renderPrompt(null);
+    };
+
+    promptArea.appendChild(actionSelect);
+    promptArea.appendChild(targetSelect);
+    promptArea.appendChild(guessSelect);
+    promptArea.appendChild(submitButton);
+
+    function updateVisibility() {
+      const selected = actions.find((item) => item.id === actionSelect.value);
+      targetSelect.classList.toggle("hidden", !(selected && selected.targetRequired));
+      guessSelect.classList.toggle("hidden", !(selected && selected.guessRequired));
+    }
+
+    actionSelect.onchange = updateVisibility;
+    updateVisibility();
+  }
+
+  function renderChallengePrompt(interaction) {
+    const prompt = interaction.payload || {};
+    appendPromptState(prompt.title, prompt.description || `Action ${prompt.actionLabel || prompt.action} claims ${prompt.claimedRole}.`);
+
+    const passButton = document.createElement("button");
+    passButton.className = "secondary";
+    passButton.textContent = "Pass";
+    passButton.onclick = () => {
+      state.socket.send(JSON.stringify({
+        type: "command",
+        interactionId: interaction.id,
+        kind: "challenge_decision",
+        payload: { challengerIndex: state.playerIndex, pass: true },
+      }));
+      renderPrompt(null);
+    };
+
+    const challengeButton = document.createElement("button");
+    challengeButton.textContent = "Challenge";
+    challengeButton.onclick = () => {
+      state.socket.send(JSON.stringify({
+        type: "command",
+        interactionId: interaction.id,
+        kind: "challenge_decision",
+        payload: { challengerIndex: state.playerIndex, pass: false },
+      }));
+      renderPrompt(null);
+    };
+
+    promptArea.appendChild(passButton);
+    promptArea.appendChild(challengeButton);
+  }
+
+  function renderCounterPrompt(interaction) {
+    const prompt = interaction.payload || {};
+    const allowedActions = Array.isArray(prompt.allowedActions) ? prompt.allowedActions : [];
+    appendPromptState(prompt.title, prompt.description || `Respond to ${prompt.mainActionLabel || prompt.mainAction}.`);
+
+    const passButton = document.createElement("button");
+    passButton.className = "secondary";
+    passButton.textContent = "Pass";
+    passButton.onclick = () => {
+      state.socket.send(JSON.stringify({
+        type: "command",
+        interactionId: interaction.id,
+        kind: "counter_decision",
+        payload: { playerIndex: state.playerIndex, pass: true },
+      }));
+      renderPrompt(null);
+    };
+    promptArea.appendChild(passButton);
+
+    const actionList = document.createElement("div");
+    actionList.className = "action-list";
+
+    allowedActions.forEach((actionId) => {
+      const card = document.createElement("div");
+      card.className = "action-card";
+      const title = document.createElement("strong");
+      title.textContent = actionId.label || actionId.id;
+      const description = document.createElement("p");
+      description.textContent = actionId.description || "Use this response to block the action.";
+      card.appendChild(title);
+      card.appendChild(description);
+
+      const button = document.createElement("button");
+      button.textContent = actionId.label || actionId.id;
+      button.onclick = () => {
+        state.socket.send(JSON.stringify({
+          type: "command",
+          interactionId: interaction.id,
+          kind: "counter_decision",
+          payload: {
+            playerIndex: state.playerIndex,
+            pass: false,
+            command: {
+              actionId: actionId.id,
+              actorIndex: state.playerIndex,
+              mainAction: prompt.mainAction,
+            },
+          },
+        }));
+        renderPrompt(null);
+      };
+      card.appendChild(button);
+      actionList.appendChild(card);
+    });
+
+    promptArea.appendChild(actionList);
+  }
+
+  function renderCardSelectionPrompt(interaction) {
+    const prompt = interaction.payload || {};
+    const cards = Array.isArray(prompt.cards) ? prompt.cards : [];
+    const count = Number(prompt.count || 0);
+    if (count <= 0) {
+      appendPromptState(prompt.title, prompt.description || "This step prompt is missing card selection data.");
+      appendParagraph(promptArea, "Unsupported step prompt payload.");
+      return;
+    }
+
+    appendPromptState(
+      prompt.title,
+      prompt.description || `Choose ${count} card${count > 1 ? "s" : ""}.`,
+    );
+
+    const optionSelect = document.createElement("select");
+    optionSelect.size = Math.max(cards.length, 2);
+    if (count > 1) {
+      optionSelect.multiple = true;
+    }
+    cards.forEach((card) => {
+      const option = document.createElement("option");
+      option.value = card.index;
+      option.textContent = card.label;
+      optionSelect.appendChild(option);
+    });
+    promptArea.appendChild(optionSelect);
+
+    const submitButton = document.createElement("button");
+    submitButton.textContent = "Submit selection";
+    submitButton.onclick = () => {
+      const selected = Array.from(optionSelect.selectedOptions).map((option) => Number(option.value));
+      if (selected.length !== count) {
+        alert(`Pick exactly ${count} option(s).`);
+        return;
+      }
+      state.socket.send(JSON.stringify({
+        type: "command",
+        interactionId: interaction.id,
+        kind: "card_selection",
+        payload: { selectedIndices: selected },
+      }));
+      renderPrompt(null);
+    };
+    promptArea.appendChild(submitButton);
+  }
+
+  async function createRoom() {
+    const payload = {
+      leaderName: createLeaderName.value.trim() || "Leader",
+      playerCount: Number(createPlayerCount.value || 2),
+      deviceId: state.deviceId,
+    };
+    const response = await fetch("/api/rooms", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      alert(result.error || "Failed to create room");
+      return;
+    }
+    storeJoinedSession(result);
+    state.roomCode = result.roomCode || result.roomId;
+    state.joinUrl = result.joinUrl || `${window.location.origin}/play?roomId=${encodeURIComponent(result.roomId)}`;
+    joinRoomCode.value = state.roomCode;
+    lobbyPanel.classList.add("hidden");
+    gamePanel.classList.remove("hidden");
+    await connectSocket(result);
+    await loadRooms();
+  }
+
+  async function joinRoom(roomId, playerName) {
+    const response = await fetch(`/api/rooms/${encodeURIComponent(roomId)}/join`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ playerName, deviceId: state.deviceId }),
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      throw new Error(result.error || "Failed to join room");
+    }
+    storeJoinedSession(result);
+    return result;
+  }
+
+  async function loadResumableGames() {
+    try {
+      const response = await fetch(`/api/me/resumable-games?deviceId=${encodeURIComponent(state.deviceId)}`);
+      if (!response.ok) {
+        state.resumableGames = [];
+        state.resumePromptVisible = false;
+        renderResumePrompt();
+        return;
+      }
+      const payload = await response.json();
+      state.resumableGames = Array.isArray(payload.games) ? payload.games : [];
+      state.resumePromptVisible = state.resumableGames.length > 0;
+      renderResumePrompt();
+    } catch (error) {
+      console.warn("failed to load resumable games", error);
+      state.resumableGames = [];
+      state.resumePromptVisible = false;
+      renderResumePrompt();
+    }
+  }
+
+  function connectSocket(joined) {
+    if (state.reconnectTimer) {
+      window.clearTimeout(state.reconnectTimer);
+      state.reconnectTimer = null;
+    }
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const socket = new WebSocket(
+      `${protocol}//${window.location.host}/ws?roomId=${encodeURIComponent(joined.roomId)}&sessionId=${encodeURIComponent(joined.sessionId)}`,
+      [`resume.${joined.resumeToken}`],
+    );
+    state.socket = socket;
+    state.roomId = joined.roomId;
+    state.roomCode = joined.roomCode || joined.roomId;
+    state.joinUrl = joined.joinUrl || `${window.location.origin}/play?roomId=${encodeURIComponent(joined.roomId)}`;
+    state.playerIndex = joined.playerIndex;
+    state.playerName = joined.playerName;
+    state.sessionId = joined.sessionId;
+    state.resumeToken = joined.resumeToken;
+    storeJoinedSession(joined);
+    identityTitle.textContent = joined.playerName;
+
+    socket.onopen = () => {
+      setConnectionStatus("Connected");
+      logLine(`${joined.resumed ? "Resumed" : "Connected to"} room ${joined.roomId} as ${joined.playerName}.`);
+    };
+
+    socket.onclose = () => {
+      if (state.manualDisconnect) {
+        setConnectionStatus("Disconnected");
+        logLine("Socket closed.");
+        return;
+      }
+      logLine("Socket closed. Retrying in 1s.");
+      scheduleReconnect();
+    };
+
+    socket.onerror = () => {
+      setConnectionStatus("Connection error");
+    };
+
+    // Manual verification target:
+    // 1. Browser receives only one live prompt type: "prompt".
+    // 2. Browser branches on interaction.kind, not websocket type.
+    // 3. Browser replies with one live command type: "command".
+    socket.onmessage = (event) => {
+      const message = JSON.parse(event.data);
+      if (message.type === "room.sync") {
+        state.room = message.room || state.room;
+        state.summary = message.summary;
+        state.hand = message.hand || [];
+        state.connectedPlayers = (message.room && message.room.connectedPlayers) || [];
+        state.statusTitle = message.statusTitle || "";
+        state.statusDescription = message.statusDescription || "";
+        if (state.room && state.room.phase !== "in_turn") {
+          state.currentPrompt = null;
+        }
+        renderHand();
+        renderSummary();
+        renderPrompt(state.currentPrompt);
+        const line = roomLogLine();
+        if (line && line !== state.lastRoomLog) {
+          logLine(line);
+          state.lastRoomLog = line;
+        }
+        return;
+      }
+      if (message.type === "turn.result") {
+        state.summary = message.summary;
+        state.hand = message.hand || [];
+        renderHand();
+        renderSummary();
+        renderPrompt(null);
+        (message.logs || []).forEach((line) => logLine(line));
+        (message.privateLogs || []).forEach((line) => logLine(`[private] ${line}`, "private"));
+        return;
+      }
+      if (message.type === "game.over") {
+        const gameOverStatus = gameOverStatusCopy(message.winnerName);
+        state.room = Object.assign({}, state.room, {
+          phase: "game_over",
+          canStart: false,
+          canRestart: true,
+          canDelete: true,
+        });
+        state.summary = message.summary;
+        state.currentPrompt = null;
+        state.statusTitle = gameOverStatus.title;
+        state.statusDescription = gameOverStatus.description;
+        renderSummary();
+        renderPrompt(null);
+        logLine(`Game over. Winner: ${message.winnerName}.`);
+        return;
+      }
+      if (message.type === "prompt") {
+        renderSummary();
+        renderPrompt(message.interaction || null);
+        logLine(promptLogLine(message.interaction || null));
+        return;
+      }
+      logLine(`Unhandled message ${message.type}`);
+    };
+  }
+
+  async function startJoinPage(roomId) {
+    lobbyPanel.classList.remove("hidden");
+    gamePanel.classList.add("hidden");
+    if (roomId) {
+      joinRoomCode.value = roomId;
+    }
+  }
+
+  async function submitJoin() {
+    lobbyPanel.classList.add("hidden");
+    gamePanel.classList.remove("hidden");
+    setConnectionStatus("Joining...");
+    try {
+      const joined = await joinRoom(joinRoomCode.value.trim(), joinPlayerName.value.trim() || "Player");
+      state.manualDisconnect = false;
+      await connectSocket(joined);
+    } catch (error) {
+      lobbyPanel.classList.remove("hidden");
+      gamePanel.classList.add("hidden");
+      setConnectionStatus("Join failed");
+      clearNode(promptArea);
+      appendParagraph(promptArea, error.message);
+      alert(error.message);
+    }
+  }
+
+  async function loadRooms() {
+    const response = await fetch("/api/rooms");
+    const result = await response.json();
+    clearNode(roomList);
+    const rooms = result.rooms || [];
+    if (!rooms.length) {
+      appendParagraph(roomList, "No rooms yet.");
+      return;
+    }
+
+    rooms.forEach((room) => {
+      const panel = document.createElement("div");
+      panel.className = "player";
+      const roomTitle = document.createElement("strong");
+      roomTitle.textContent = room.roomId;
+      panel.appendChild(roomTitle);
+      panel.appendChild(document.createElement("br"));
+      panel.appendChild(document.createTextNode(`Phase: ${room.room.phase}`));
+      panel.appendChild(document.createElement("br"));
+      panel.appendChild(document.createTextNode(`Players: ${room.room.joinedPlayers} of ${room.room.playerCount}`));
+      panel.appendChild(document.createElement("br"));
+      panel.appendChild(document.createTextNode(`Turn: ${room.summary.turnNumber}`));
+      panel.appendChild(document.createElement("br"));
+      const link = document.createElement("a");
+      link.className = "demo-link";
+      link.target = "_blank";
+      link.rel = "noreferrer";
+      link.href = `${window.location.origin}/play?roomId=${encodeURIComponent(room.roomId)}`;
+      link.textContent = `Open join page for ${room.roomId}`;
+      panel.appendChild(link);
+      roomList.appendChild(panel);
+    });
+  }
+
+  async function copyText(value, message) {
+    try {
+      await navigator.clipboard.writeText(value);
+      logLine(message);
+    } catch (error) {
+      console.warn(error);
+      alert(value);
+    }
+  }
+
+  createRoomButton.addEventListener("click", createRoom);
+  joinRoomButton.addEventListener("click", submitJoin);
+  refreshRoomsButton.addEventListener("click", loadRooms);
+  resumePromptButton.addEventListener("click", async () => {
+    const game = state.resumableGames[0];
+    const storedSession = storedSessionForGame(game);
+    if (!game || !storedSession) {
+      return;
+    }
+
+    state.manualDisconnect = false;
+    state.resumePromptVisible = false;
+    renderResumePrompt();
+    lobbyPanel.classList.add("hidden");
+    gamePanel.classList.remove("hidden");
+    setConnectionStatus("Reconnecting...");
+    connectSocket({
+      roomId: storedSession.roomId,
+      roomCode: storedSession.roomCode,
+      joinUrl: storedSession.joinUrl,
+      sessionId: storedSession.sessionId,
+      resumeToken: storedSession.resumeToken,
+      playerIndex: storedSession.playerIndex,
+      playerName: storedSession.playerName,
+      resumed: true,
+    });
+  });
+  dismissResumePromptButton.addEventListener("click", () => {
+    state.resumePromptVisible = false;
+    renderResumePrompt();
+  });
+  loadRooms();
+  loadResumableGames();
+
+  if (roomIdParam !== null) {
+    startJoinPage(roomIdParam);
+  }
+})();
+</script>
+</body>
+</html>
