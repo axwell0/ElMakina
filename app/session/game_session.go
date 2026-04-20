@@ -850,12 +850,11 @@ func (s *GameSession) watchOpenInput(turn *activeTurn) {
 		case <-turn.done:
 			return
 		case input := <-turn.provider.Events():
-			s.setOpenInput(input)
 			interaction, err := interactionFromOpenInput(s, input)
-			if err != nil {
-				continue
+			if err == nil {
+				s.Interactions.Open(interaction)
 			}
-			s.Interactions.Open(interaction)
+			s.setOpenInput(input)
 		}
 	}
 }

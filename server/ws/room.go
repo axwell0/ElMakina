@@ -19,6 +19,7 @@ import (
 // Room is the hosted runtime wrapper around one game session.
 type Room struct {
 	session    *sessionapp.GameSession
+	connections *ConnectionRegistry
 	logger     *slog.Logger
 	turnConfig ports.TurnConfig
 
@@ -35,6 +36,7 @@ func newRoom(session *sessionapp.GameSession, cfg ports.TurnConfig, logger *slog
 	}
 	return &Room{
 		session:    session,
+		connections: NewConnectionRegistry(),
 		logger:     logger,
 		turnConfig: cfg,
 	}, nil
@@ -253,15 +255,18 @@ func (r *Room) Register(client sessionapp.Client) error {
 		return err
 	}
 	session := client.Session()
+	r.connections.Attach(session.ID, session.PlayerIndex, client)
 	r.logger.Info("registered websocket session", "room_id", r.session.ID, "session_id", session.ID, "player_index", session.PlayerIndex)
 	return nil
 }
 
 // UnregisterIfCurrent removes a session only if this client is still active.
 func (r *Room) UnregisterIfCurrent(sessionID string, client sessionapp.Client) bool {
-	// Only detach if the caller still matches the current active client.
-	current := r.session.Client(sessionID)
-	if current == nil || current != client {
+	session := r.session.Session(sessionID)
+	if session == nil {
+		return false
+	}
+	if !r.connections.DetachIfCurrent(sessionID, session.PlayerIndex, client) {
 		return false
 	}
 	if !r.session.DetachIfCurrent(sessionID, client) {
@@ -273,36 +278,45 @@ func (r *Room) UnregisterIfCurrent(sessionID string, client sessionapp.Client) b
 
 // Client returns the active websocket client for a session ID.
 func (r *Room) Client(sessionID string) sessionapp.Client {
-	// Room is just a thin view over the session registry.
-	return r.session.Client(sessionID)
+	connection, ok := r.connections.Connection(sessionID)
+	if !ok {
+		return nil
+	}
+	client, ok := connection.(sessionapp.Client)
+	if !ok {
+		return nil
+	}
+	return client
 }
 
 // HasClient reports whether a session currently has an attached websocket.
 func (r *Room) HasClient(sessionID string) bool {
-	return r.Client(sessionID) != nil
+	_, ok := r.connections.Connection(sessionID)
+	return ok
 }
 
 // IsCurrent reports whether the supplied client is still the active websocket.
 func (r *Room) IsCurrent(sessionID string, client sessionapp.Client) bool {
-	return r.session.IsCurrent(sessionID, client)
+	current, ok := r.connections.Connection(sessionID)
+	return ok && current == client
 }
 
 // sendToSession sends a message to one connected session.
 func (r *Room) sendToSession(sessionID string, message any) error {
 	// Look up the live client first; disconnected sessions cannot receive messages.
-	client := r.Client(sessionID)
-	if client == nil {
+	connection, ok := r.connections.Connection(sessionID)
+	if !ok {
 		return fmt.Errorf("session %q is not connected", sessionID)
 	}
 	// Use a background context here because message sending is not tied to an HTTP deadline.
-	if err := client.Send(context.Background(), message); err != nil {
+	if err := connection.Send(context.Background(), message); err != nil {
 		r.logger.Warn("failed sending websocket message", "room_id", r.session.ID, "session_id", sessionID, "error", err)
-		if r.UnregisterIfCurrent(sessionID, client) {
+		if client, ok := connection.(sessionapp.Client); ok && r.UnregisterIfCurrent(sessionID, client) {
 			if session := r.session.Session(sessionID); session != nil {
 				session.Disconnect(time.Now().UTC())
 			}
 		}
-		_ = client.Close()
+		_ = connection.Close()
 		return err
 	}
 	return nil
@@ -311,8 +325,7 @@ func (r *Room) sendToSession(sessionID string, message any) error {
 // SendToSessionIfConnected sends a message when the session has a live websocket.
 func (r *Room) SendToSessionIfConnected(sessionID string, message any) (bool, error) {
 	// This helper lets callers avoid treating a disconnected socket as a hard failure.
-	client := r.Client(sessionID)
-	if client == nil {
+	if !r.HasClient(sessionID) {
 		return false, nil
 	}
 	if err := r.sendToSession(sessionID, message); err != nil {
@@ -334,19 +347,35 @@ func (r *Room) SendToPlayerIfConnected(playerIndex int, message any) (bool, erro
 // CloseAllClients disconnects all registered websocket clients and clears the registry.
 func (r *Room) CloseAllClients() {
 	// Snapshot the connected client objects first so we can safely disconnect them after registry cleanup.
-	connectedPlayers := r.session.ConnectedPlayers()
-	clients := make([]sessionapp.Client, 0, len(connectedPlayers))
-	for _, playerIndex := range connectedPlayers {
-		client := r.session.ClientForPlayer(playerIndex)
-		if client == nil {
+	type connectedClient struct {
+		sessionID   string
+		playerIndex int
+		client      sessionapp.Client
+	}
+	clients := make([]connectedClient, 0, len(r.session.SessionList()))
+	for _, session := range r.session.SessionList() {
+		if session == nil {
 			continue
 		}
-		clients = append(clients, client)
+		connection, ok := r.connections.Connection(session.ID)
+		if !ok {
+			continue
+		}
+		client, ok := connection.(sessionapp.Client)
+		if !ok {
+			continue
+		}
+		clients = append(clients, connectedClient{
+			sessionID:   session.ID,
+			playerIndex: session.PlayerIndex,
+			client:      client,
+		})
 	}
 	_ = r.session.CloseAllClients()
 	// Mark each underlying session as disconnected so the room snapshot reflects reality.
-	for _, client := range clients {
-		if session := client.Session(); session != nil {
+	for _, item := range clients {
+		r.connections.DetachIfCurrent(item.sessionID, item.playerIndex, item.client)
+		if session := item.client.Session(); session != nil {
 			session.Disconnect(time.Now().UTC())
 		}
 	}
