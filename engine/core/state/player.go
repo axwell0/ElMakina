@@ -1,7 +1,7 @@
 package state
 
 import (
-	models "github.com/your-org/elmakina/engine/core/types"
+	models "github.com/axwell0/elmakina/engine/core/types"
 )
 
 type Player struct {

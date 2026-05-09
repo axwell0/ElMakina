@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"math/rand/v2"
 
-	models "github.com/your-org/elmakina/engine/core/types"
-	"github.com/your-org/elmakina/internal/apperrors"
+	models "github.com/axwell0/elmakina/engine/core/types"
+	"github.com/axwell0/elmakina/internal/apperrors"
 )
 
 type Deck []Card
