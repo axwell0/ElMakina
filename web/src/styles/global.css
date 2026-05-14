@@ -1,0 +1,26 @@
+@import url("./tokens.css");
+@import url("./layout.css");
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  color: var(--makina-ink);
+  background:
+    radial-gradient(circle at 12% 18%, rgba(241, 231, 169, 0.78), transparent 26rem),
+    radial-gradient(circle at 76% 34%, rgba(243, 220, 231, 0.86), transparent 24rem),
+    linear-gradient(135deg, var(--makina-paper), #ffffff 42%, var(--makina-box-blush));
+  font-family: var(--font-ui);
+}
+
+button {
+  font: inherit;
+}

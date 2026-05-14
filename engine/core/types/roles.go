@@ -1,6 +1,10 @@
 package types
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+	"slices"
+)
 
 type Role string
 
@@ -24,13 +28,13 @@ var Roles = []Role{
 	Politician,
 }
 
-// ParseRole takes in a string and resolves it to a role
+var ErrInvalidRole = errors.New("invalid role")
+
+// ParseRole takes in a string and resolves it to a role.
 func ParseRole(value string) (Role, error) {
 	role := Role(value)
-	for _, validRole := range Roles {
-		if role == validRole {
-			return role, nil
-		}
+	if slices.Contains(Roles, role) {
+		return role, nil
 	}
-	return "", fmt.Errorf("invalid role: %s", value)
+	return "", fmt.Errorf("%w: %s", ErrInvalidRole, value)
 }

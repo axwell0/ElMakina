@@ -21,9 +21,3 @@ type AccusePayload struct {
 
 // isActionPayload marks AccusePayload as a valid action payload variant.
 func (ap AccusePayload) isActionPayload() {}
-
-// NoPayload is used by actions that don't require any additional data.
-type NoPayload struct{}
-
-// isActionPayload marks NoPayload as a valid action payload variant.
-func (np NoPayload) isActionPayload() {}

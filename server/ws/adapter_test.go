@@ -3,85 +3,94 @@
 package ws
 
 import (
-	"math/rand/v2"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
-	sessionapp "example.com/elmakina/app/session"
-	corestate "example.com/elmakina/engine/core/state"
-	coretypes "example.com/elmakina/engine/core/types"
-	runtimeturn "example.com/elmakina/engine/runtime/turn"
+	coretypes "github.com/axwell0/elmakina/engine/core/types"
+	turnmodel "github.com/axwell0/elmakina/engine/turn"
+	api "github.com/axwell0/elmakina/internal/api"
+	sessionapp "github.com/axwell0/elmakina/internal/app/session"
 )
 
-func TestBuildPromptEnvelopeUsesSessionInteractionState(t *testing.T) {
-	interaction := &sessionapp.InteractionState{
-		ID:   "ix-1",
-		Kind: sessionapp.InteractionChallenge,
-		Recipients: sessionapp.RecipientSet{
-			Players: []int{1},
-		},
-		Payload: sessionapp.ChallengeInteraction{
+// The adapter tests verify that engine snapshots become the exact websocket payloads the browser expects.
+func TestBuildPromptEnvelopeUsesSessionPrompt(t *testing.T) {
+	prompt := &sessionapp.Prompt{
+		ID:         "ix-1",
+		Kind:       sessionapp.PromptChallenge,
+		Recipients: []int{1},
+		Payload: sessionapp.ChallengePrompt{
 			ActorIndex:  0,
 			Action:      "assassinate",
 			ClaimedRole: "Colonel",
 		},
 	}
 
-	envelope, err := BuildPromptEnvelope(interaction)
+	envelope, err := BuildPromptEnvelope(prompt)
 	require.NoError(t, err)
-	require.Equal(t, MessageType("prompt"), envelope.Type)
-	require.Equal(t, "challenge", envelope.Interaction.Kind)
+	require.Equal(t, api.MessageType("prompt"), envelope.Type)
+	require.Equal(t, "challenge", envelope.Prompt.Kind)
 }
 
 func TestPromptPathNoLongerDependsOnProjectionClient(t *testing.T) {
-	interaction := &sessionapp.InteractionState{
-		ID:   "ix-1",
-		Kind: sessionapp.InteractionMainAction,
-		Recipients: sessionapp.RecipientSet{
-			Players: []int{0},
-		},
-		Payload: sessionapp.MainActionInteraction{
+	prompt := &sessionapp.Prompt{
+		ID:         "ix-1",
+		Kind:       sessionapp.PromptMainAction,
+		Recipients: []int{0},
+		Payload: sessionapp.MainActionPrompt{
 			ActorIndex: 0,
 			TurnNumber: 1,
 			Title:      "Choose",
 		},
 	}
 
-	envelope, err := BuildPromptEnvelope(interaction)
+	envelope, err := BuildPromptEnvelope(prompt)
 	require.NoError(t, err)
-	require.Equal(t, "main_action", envelope.Interaction.Kind)
+	require.Equal(t, "main_action", envelope.Prompt.Kind)
+}
+
+func TestBuildPromptEnvelopeAllowsClearedPrompt(t *testing.T) {
+	envelope, err := BuildClearedPromptEnvelope("ix-1")
+	require.NoError(t, err)
+	require.Equal(t, api.TypePrompt, envelope.Type)
+	require.Nil(t, envelope.Prompt)
+	require.Equal(t, "ix-1", envelope.ClearedPromptID)
 }
 
 func TestBuildTurnResultMessageIncludesViewerPrivateData(t *testing.T) {
-	session := newTestSession(t)
-	session.State.TurnNumber = 4
+	lobby := newTestLobby(t)
+	for i := 0; i < 3; i++ {
+		require.NoError(t, lobby.Game().IncrementTurn())
+	}
 
-	result := &runtimeturn.TurnResult{
-		Logs:         []string{"public log"},
-		PrivateLogs:  map[int][]string{0: {"private log"}},
-		Main:         corestate.NewNoPayloadAction(coretypes.Income, 0),
+	result := &turnmodel.TurnResult{
+		Logs:        []string{"public log"},
+		PrivateLogs: map[int][]string{0: {"private log"}},
+		Main: &coretypes.PlayerAction{
+			Action:     coretypes.Income,
+			ActorIndex: 0,
+		},
 		MainApplied:  true,
 		MainCanceled: false,
 	}
 
-	message, err := BuildTurnResultMessage(session, 0, result)
+	message, err := BuildTurnResultMessage(lobby, 0, result)
 	require.NoError(t, err)
-	require.Equal(t, TypeTurnResult, message.Type)
-	require.Equal(t, session.ID, message.RoomID)
+	require.Equal(t, api.TypeTurnResult, message.Type)
+	require.Equal(t, lobby.ID(), message.RoomID)
 	require.Equal(t, 4, message.TurnNumber)
 	require.Equal(t, []string{"public log"}, message.Logs)
 	require.Equal(t, []string{"private log"}, message.PrivateLogs)
-	require.Len(t, message.Hand, len(session.State.Players[0].Hand))
+	require.Len(t, message.Hand, len(lobby.Game().Snapshot().players[0].Hand))
 	require.Equal(t, "income", message.Main.ID)
 }
 
 func TestBuildRoomSyncMessageNestsConnectedPlayersInRoomState(t *testing.T) {
-	session, message := buildLobbyRoomSyncMessage(t, func(session *sessionapp.GameSession) {
-		require.NoError(t, session.MarkReady(0, true))
+	lobby, message := buildLobbyRoomSyncMessage(t, func(lobby *sessionapp.Lobby) {
+		require.NoError(t, lobby.MarkReady(0, true))
 	})
-	require.Equal(t, TypeRoomSync, message.Type)
+	require.Equal(t, api.TypeRoomSync, message.Type)
 	require.Equal(t, "lobby", message.Room.Phase)
 	require.Equal(t, 0, message.Room.LeaderPlayerIndex)
 	require.Equal(t, 2, message.Room.PlayerCount)
@@ -92,38 +101,39 @@ func TestBuildRoomSyncMessageNestsConnectedPlayersInRoomState(t *testing.T) {
 	require.True(t, message.Room.CanRestart)
 	require.True(t, message.Room.CanDelete)
 	require.Equal(t, "A", message.PlayerName)
-	require.Len(t, message.Hand, len(session.State.Players[0].Hand))
+	require.Len(t, message.Hand, len(lobby.Game().Snapshot().players[0].Hand))
 }
 
 func TestBuildRoomSyncMessageIncludesLeaderAndLifecycleFlags(t *testing.T) {
 	_, message := buildLobbyRoomSyncMessage(t, nil)
-	require.Equal(t, TypeRoomSync, message.Type)
+	require.Equal(t, api.TypeRoomSync, message.Type)
 	require.Equal(t, 0, message.Room.LeaderPlayerIndex)
 	require.True(t, message.Room.CanRestart)
 	require.True(t, message.Room.CanDelete)
 }
 
-func newTestSession(t *testing.T) *sessionapp.GameSession {
+// newTestSession creates a deterministic room state that the adapter tests can reuse.
+func newTestLobby(t *testing.T) *sessionapp.Lobby {
 	t.Helper()
 
-	session, err := sessionapp.NewGameSession("room-1", "A", 2, rand.New(rand.NewPCG(1, 2)))
+	lobby, err := sessionapp.NewLobby("room-1", "A", 2)
 	require.NoError(t, err)
 
-	return session
+	return lobby
 }
 
-func buildLobbyRoomSyncMessage(t *testing.T, mutate func(*sessionapp.GameSession)) (*sessionapp.GameSession, RoomSyncMessage) {
+// buildLobbyRoomSyncMessage joins the leader into a lobby and lets the caller tweak the session before projection.
+func buildLobbyRoomSyncMessage(t *testing.T, mutate func(*sessionapp.Lobby)) (*sessionapp.Lobby, api.RoomSyncView) {
 	t.Helper()
 
-	session := newTestSession(t)
-	playerSession, err := session.JoinPlayer("A", time.Unix(0, 0).UTC())
+	lobby := newTestLobby(t)
+	_, err := lobby.JoinPlayer("A", time.Unix(0, 0).UTC())
 	require.NoError(t, err)
-	playerSession.MarkSeen(playerSession.LastSeenAt)
 	if mutate != nil {
-		mutate(session)
+		mutate(lobby)
 	}
 
-	message, err := BuildRoomSyncMessage(session, 0)
+	message, err := BuildRoomSyncMessage(lobby, 0, []int{0})
 	require.NoError(t, err)
-	return session, message
+	return lobby, message
 }

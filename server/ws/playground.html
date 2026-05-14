@@ -211,6 +211,17 @@
           <option value="8">8 players</option>
           <option value="9">9 players</option>
         </select>
+        <div class="status-card">
+          <strong>Game Config</strong>
+          <label>Max coins</label>
+          <input id="configMaxCoins" type="number" min="1" max="30" value="12">
+          <label>Starting coins</label>
+          <input id="configStartingCoins" type="number" min="0" max="12" value="2">
+          <label>Challenge timeout (seconds)</label>
+          <input id="configChallengeTimeout" type="number" min="0" max="300" value="30">
+          <label>Counter timeout (seconds)</label>
+          <input id="configCounterTimeout" type="number" min="0" max="300" value="30">
+        </div>
         <button id="createRoomButton">Create Room</button>
       </div>
       <div>
@@ -275,6 +286,9 @@
   // 1. First load creates a device ID in localStorage.
   // 2. Returning load calls /api/me/resumable-games with that device ID.
   // 3. Matching sessions render a resume prompt instead of auto-resuming.
+  // The device ID is just the discovery handle; the saved session's resume token
+  // is still what authorizes the eventual websocket reconnect.
+  // Browser state stays in one object so reconnects and renders read the same source of truth.
   const state = {
     deviceId: ensureDeviceId(),
     savedSessions: loadStoredSessions(),
@@ -293,13 +307,16 @@
     hand: [],
     connectedPlayers: [],
     currentPrompt: null,
+    latestPromptId: null,
     statusTitle: "",
     statusDescription: "",
     lastRoomLog: "",
     reconnectTimer: null,
     manualDisconnect: false,
+    resyncInFlight: false,
   };
 
+  // Cache the DOM nodes up front so the render functions can stay focused on state changes.
   const params = new URLSearchParams(window.location.search);
   const roomIdParam = params.get("roomId");
 
@@ -323,9 +340,31 @@
   const playerSummaries = document.getElementById("playerSummaries");
   const createLeaderName = document.getElementById("createLeaderName");
   const createPlayerCount = document.getElementById("createPlayerCount");
+  const configMaxCoins = document.getElementById("configMaxCoins");
+  const configStartingCoins = document.getElementById("configStartingCoins");
+  const configChallengeTimeout = document.getElementById("configChallengeTimeout");
+  const configCounterTimeout = document.getElementById("configCounterTimeout");
   const joinPlayerName = document.getElementById("joinPlayerName");
   const joinRoomCode = document.getElementById("joinRoomCode");
 
+  function buildGameConfig() {
+    return {
+      turn: {
+        turnTimeoutMillis: 60000,
+        challengeTimeoutMillis: Number(configChallengeTimeout.value || 30) * 1000,
+        counterTimeoutMillis: Number(configCounterTimeout.value || 30) * 1000,
+      },
+      setup: { deckCopies: 3 },
+      economy: {
+        maxCoins: Number(configMaxCoins.value || 12),
+        startingCoins: Number(configStartingCoins.value || 2),
+      },
+    };
+  }
+
+  // ensureDeviceId creates one durable browser identity for resumable-game discovery.
+  // It is intentionally separate from sessionId because one browser may have
+  // several resumable sessions over time.
   function ensureDeviceId() {
     let deviceId = localStorage.getItem(DEVICE_ID_KEY);
     if (!deviceId) {
@@ -335,6 +374,7 @@
     return deviceId;
   }
 
+  // Session storage keeps the last joined room details so the resume flow can restore them later.
   function loadStoredSessions() {
     try {
       const raw = localStorage.getItem(SESSION_STORE_KEY);
@@ -349,10 +389,12 @@
     }
   }
 
+  // Persist the local session cache every time a room is joined or resumed.
   function persistStoredSessions() {
     localStorage.setItem(SESSION_STORE_KEY, JSON.stringify(state.savedSessions));
   }
 
+  // storeJoinedSession records the room metadata that the socket needs for reconnects.
   function storeJoinedSession(joined) {
     state.savedSessions[joined.sessionId] = {
       roomId: joined.roomId,
@@ -366,6 +408,7 @@
     persistStoredSessions();
   }
 
+  // storedSessionForGame finds the cached resume details for a resumable game entry.
   function storedSessionForGame(game) {
     if (!game || !game.sessionId) {
       return null;
@@ -373,6 +416,7 @@
     return state.savedSessions[game.sessionId] || null;
   }
 
+  // renderResumePrompt either hides the banner or shows the first resumable game we found.
   function renderResumePrompt() {
     if (!state.resumePromptVisible || state.resumableGames.length === 0) {
       resumePrompt.classList.add("hidden");
@@ -388,10 +432,12 @@
     resumePromptButton.textContent = storedSession ? "Resume Game" : "Missing local session";
   }
 
+  // clearNode removes all children before a render step repopulates the target element.
   function clearNode(node) {
     node.replaceChildren();
   }
 
+  // appendParagraph is the small helper used for fallback text and status messages.
   function appendParagraph(container, text, className = "") {
     const paragraph = document.createElement("p");
     if (className) {
@@ -402,6 +448,7 @@
     return paragraph;
   }
 
+  // logLine appends a new scrollable entry to the activity log.
   function logLine(line, tone = "public") {
     const entry = document.createElement("div");
     entry.className = `log-entry${tone === "private" ? " private" : ""}`;
@@ -410,10 +457,12 @@
     logArea.scrollTop = logArea.scrollHeight;
   }
 
+  // setConnectionStatus updates the small connection banner at the top of the game view.
   function setConnectionStatus(text) {
     connectionStatus.textContent = text;
   }
 
+  // renderHand redraws the viewer's private hand from the latest room sync.
   function renderHand() {
     clearNode(handCards);
     if (!state.hand.length) {
@@ -431,17 +480,20 @@
     });
   }
 
+  // playerNameByIndex resolves a player label for the summary and prompt copy.
   function playerNameByIndex(playerIndex) {
     if (!state.summary) return `player ${playerIndex}`;
     const player = state.summary.players.find((item) => item.playerIndex === playerIndex);
     return player ? player.name : `player ${playerIndex}`;
   }
 
+  // describePlayers turns a list of player indices into a readable name list.
   function describePlayers(indices) {
     if (!indices || !indices.length) return "none";
     return indices.map((playerIndex) => playerNameByIndex(playerIndex)).join(", ");
   }
 
+  // phaseLabel maps the internal phase string onto a nicer UI label.
   function phaseLabel(phase) {
     if (phase === "lobby") return "Lobby";
     if (phase === "in_turn") return "Match live";
@@ -449,6 +501,7 @@
     return "Waiting";
   }
 
+  // roomLogLine describes the current room snapshot in one sentence for the log.
   function roomLogLine() {
     if (!state.room || !state.summary) return "";
     const leader = playerNameByIndex(state.room.leaderPlayerIndex);
@@ -462,6 +515,7 @@
     return `Match live: turn ${state.summary.turnNumber}, waiting on ${activePlayer}.`;
   }
 
+  // promptLogLine formats a human-readable log entry for the current prompt.
   function promptLogLine(prompt) {
     if (!prompt) return "";
     if (prompt.title) return prompt.title;
@@ -471,6 +525,68 @@
     return "Prompt update";
   }
 
+  function parsePromptRevision(promptId) {
+    if (!promptId || typeof promptId !== "string") {
+      return null;
+    }
+    const parts = promptId.split(":");
+    if (parts.length < 3) {
+      return null;
+    }
+    const revision = Number(parts[parts.length - 1]);
+    if (!Number.isInteger(revision)) {
+      return null;
+    }
+    return revision;
+  }
+
+  function comparePromptOrder(leftId, rightId) {
+    const leftRevision = parsePromptRevision(leftId);
+    const rightRevision = parsePromptRevision(rightId);
+    if (leftRevision === null || rightRevision === null) {
+      return 0;
+    }
+    if (leftRevision < rightRevision) return -1;
+    if (leftRevision > rightRevision) return 1;
+    return 0;
+  }
+
+  function rememberPrompt(promptId) {
+    if (!promptId) {
+      return;
+    }
+    if (!state.latestPromptId || comparePromptOrder(state.latestPromptId, promptId) <= 0) {
+      state.latestPromptId = promptId;
+    }
+  }
+
+  async function resyncPromptState(reason) {
+    if (state.resyncInFlight || !state.sessionId) {
+      return;
+    }
+    state.resyncInFlight = true;
+    logLine(`Prompt order drift detected${reason ? `: ${reason}` : ""}. Resyncing.`);
+    const existingSocket = state.socket;
+    state.socket = null;
+    if (existingSocket) {
+      state.manualDisconnect = true;
+      existingSocket.close();
+      state.manualDisconnect = false;
+    }
+    connectSocket({
+      roomId: state.roomId,
+      roomCode: state.roomCode,
+      joinUrl: state.joinUrl,
+      playerIndex: state.playerIndex,
+      playerName: state.playerName,
+      sessionId: state.sessionId,
+      resumeToken: state.resumeToken,
+      resumed: true,
+    });
+    state.resyncInFlight = false;
+  }
+
+  // renderSummary rebuilds the room overview from the latest sync payload.
   function renderSummary() {
     clearNode(roomMeta);
     if (!state.summary) return;
@@ -479,7 +595,7 @@
     const readyPlayers = room.readyPlayers || [];
     const isLeader = room.leaderPlayerIndex === state.playerIndex;
 
-    if (state.roomId) {
+      if (state.roomId) {
       const shareCard = document.createElement("div");
       shareCard.className = "status-card";
       const strong = document.createElement("strong");
@@ -504,6 +620,16 @@
       shareCard.appendChild(copyCode);
       shareCard.appendChild(copyLink);
       roomMeta.appendChild(shareCard);
+    }
+
+    if (room.gameConfig) {
+      const configCard = document.createElement("div");
+      configCard.className = "status-card";
+      const strong = document.createElement("strong");
+      strong.textContent = "Config";
+      configCard.appendChild(strong);
+      configCard.appendChild(document.createTextNode(`Classic rules, max ${room.gameConfig.economy ? room.gameConfig.economy.maxCoins : 12} coins.`));
+      roomMeta.appendChild(configCard);
     }
 
     const statusGrid = document.createElement("div");
@@ -548,35 +674,37 @@
     });
   }
 
-  function renderPrompt(interaction) {
-    state.currentPrompt = interaction;
+  // renderPrompt chooses the right UI for the currently active prompt.
+  function renderPrompt(activePrompt) {
+    state.currentPrompt = activePrompt;
     clearNode(promptArea);
 
-    if (!interaction) {
+    if (!activePrompt) {
       renderRoomPhasePrompt();
       return;
     }
 
-    if (interaction.kind === "main_action") {
-      renderMainActionPrompt(interaction);
+    if (activePrompt.kind === "main_action") {
+      renderMainActionPrompt(activePrompt);
       return;
     }
-    if (interaction.kind === "challenge") {
-      renderChallengePrompt(interaction);
+    if (activePrompt.kind === "challenge") {
+      renderChallengePrompt(activePrompt);
       return;
     }
-    if (interaction.kind === "counter") {
-      renderCounterPrompt(interaction);
+    if (activePrompt.kind === "counter") {
+      renderCounterPrompt(activePrompt);
       return;
     }
-    if (interaction.kind === "card_selection") {
-      renderCardSelectionPrompt(interaction);
+    if (activePrompt.kind === "card_selection") {
+      renderCardSelectionPrompt(activePrompt);
       return;
     }
 
-    appendParagraph(promptArea, `Unsupported interaction ${interaction.kind}`);
+    appendParagraph(promptArea, `Unsupported prompt ${activePrompt.kind}`);
   }
 
+  // appendPromptState gives every prompt a shared title and explanatory text block.
   function appendPromptState(title, description) {
     const shell = document.createElement("div");
     shell.className = "prompt-state";
@@ -761,8 +889,8 @@
     return state.summary.players.filter((player) => player.playerIndex !== state.playerIndex && !player.eliminated);
   }
 
-  function renderMainActionPrompt(interaction) {
-    const prompt = interaction.payload || {};
+  function renderMainActionPrompt(activePrompt) {
+    const prompt = activePrompt.payload || {};
     const actions = Array.isArray(prompt.actions) ? prompt.actions : [];
     const targetChoices = targetOptions();
     appendPromptState(prompt.title, prompt.description);
@@ -813,10 +941,10 @@
     submitButton.onclick = async () => {
       const command = {
         type: "command",
-        interactionId: interaction.id,
+        promptId: activePrompt.id,
         kind: "main_action",
         payload: {
-          actionId: actionSelect.value,
+          action: actionSelect.value,
           actorIndex: state.playerIndex,
         },
       };
@@ -850,8 +978,8 @@
     updateVisibility();
   }
 
-  function renderChallengePrompt(interaction) {
-    const prompt = interaction.payload || {};
+  function renderChallengePrompt(activePrompt) {
+    const prompt = activePrompt.payload || {};
     appendPromptState(prompt.title, prompt.description || `Action ${prompt.actionLabel || prompt.action} claims ${prompt.claimedRole}.`);
 
     const passButton = document.createElement("button");
@@ -860,7 +988,7 @@
     passButton.onclick = () => {
       state.socket.send(JSON.stringify({
         type: "command",
-        interactionId: interaction.id,
+        promptId: activePrompt.id,
         kind: "challenge_decision",
         payload: { challengerIndex: state.playerIndex, pass: true },
       }));
@@ -872,7 +1000,7 @@
     challengeButton.onclick = () => {
       state.socket.send(JSON.stringify({
         type: "command",
-        interactionId: interaction.id,
+        promptId: activePrompt.id,
         kind: "challenge_decision",
         payload: { challengerIndex: state.playerIndex, pass: false },
       }));
@@ -883,9 +1011,11 @@
     promptArea.appendChild(challengeButton);
   }
 
-  function renderCounterPrompt(interaction) {
-    const prompt = interaction.payload || {};
-    const allowedActions = Array.isArray(prompt.allowedActions) ? prompt.allowedActions : [];
+  function renderCounterPrompt(activePrompt) {
+    const prompt = activePrompt.payload || {};
+    const byPlayer = prompt.allowedActionsByPlayer || {};
+    const playerActions = byPlayer[String(state.playerIndex)] || byPlayer[state.playerIndex];
+    const allowedActions = Array.isArray(playerActions) ? playerActions : (Array.isArray(prompt.allowedActions) ? prompt.allowedActions : []);
     appendPromptState(prompt.title, prompt.description || `Respond to ${prompt.mainActionLabel || prompt.mainAction}.`);
 
     const passButton = document.createElement("button");
@@ -894,7 +1024,7 @@
     passButton.onclick = () => {
       state.socket.send(JSON.stringify({
         type: "command",
-        interactionId: interaction.id,
+        promptId: activePrompt.id,
         kind: "counter_decision",
         payload: { playerIndex: state.playerIndex, pass: true },
       }));
@@ -920,15 +1050,14 @@
       button.onclick = () => {
         state.socket.send(JSON.stringify({
           type: "command",
-          interactionId: interaction.id,
+          promptId: activePrompt.id,
           kind: "counter_decision",
           payload: {
             playerIndex: state.playerIndex,
             pass: false,
             command: {
-              actionId: actionId.id,
+              action: actionId.id,
               actorIndex: state.playerIndex,
-              mainAction: prompt.mainAction,
             },
           },
         }));
@@ -941,8 +1070,8 @@
     promptArea.appendChild(actionList);
   }
 
-  function renderCardSelectionPrompt(interaction) {
-    const prompt = interaction.payload || {};
+  function renderCardSelectionPrompt(activePrompt) {
+    const prompt = activePrompt.payload || {};
     const cards = Array.isArray(prompt.cards) ? prompt.cards : [];
     const count = Number(prompt.count || 0);
     if (count <= 0) {
@@ -979,7 +1108,7 @@
       }
       state.socket.send(JSON.stringify({
         type: "command",
-        interactionId: interaction.id,
+        promptId: activePrompt.id,
         kind: "card_selection",
         payload: { selectedIndices: selected },
       }));
@@ -988,11 +1117,13 @@
     promptArea.appendChild(submitButton);
   }
 
+  // createRoom posts the lobby setup, stores the returned session, and opens the socket.
   async function createRoom() {
     const payload = {
       leaderName: createLeaderName.value.trim() || "Leader",
       playerCount: Number(createPlayerCount.value || 2),
       deviceId: state.deviceId,
+      gameConfig: buildGameConfig(),
     };
     const response = await fetch("/api/rooms", {
       method: "POST",
@@ -1014,6 +1145,7 @@
     await loadRooms();
   }
 
+  // joinRoom submits a player name and device ID to claim the next open slot.
   async function joinRoom(roomId, playerName) {
     const response = await fetch(`/api/rooms/${encodeURIComponent(roomId)}/join`, {
       method: "POST",
@@ -1028,6 +1160,8 @@
     return result;
   }
 
+  // loadResumableGames asks the server which rooms this browser can continue.
+  // This is discovery only; reconnect still uses sessionId + resumeToken.
   async function loadResumableGames() {
     try {
       const response = await fetch(`/api/me/resumable-games?deviceId=${encodeURIComponent(state.deviceId)}`);
@@ -1049,6 +1183,7 @@
     }
   }
 
+  // connectSocket wires the websocket lifecycle and routes incoming messages.
   function connectSocket(joined) {
     if (state.reconnectTimer) {
       window.clearTimeout(state.reconnectTimer);
@@ -1091,7 +1226,7 @@
 
     // Manual verification target:
     // 1. Browser receives only one live prompt type: "prompt".
-    // 2. Browser branches on interaction.kind, not websocket type.
+    // 2. Browser branches on prompt.kind, not websocket type.
     // 3. Browser replies with one live command type: "command".
     socket.onmessage = (event) => {
       const message = JSON.parse(event.data);
@@ -1143,15 +1278,31 @@
         return;
       }
       if (message.type === "prompt") {
+        const incomingPrompt = message.prompt || null;
+        const clearedPromptId = message.clearedPromptId || "";
+        if (incomingPrompt && state.latestPromptId && comparePromptOrder(incomingPrompt.id, state.latestPromptId) < 0) {
+          void resyncPromptState(`ignored stale prompt ${incomingPrompt.id}`);
+          return;
+        }
+        if (!incomingPrompt && clearedPromptId && state.latestPromptId && comparePromptOrder(clearedPromptId, state.latestPromptId) < 0) {
+          void resyncPromptState(`ignored stale prompt clear ${clearedPromptId}`);
+          return;
+        }
+        if (incomingPrompt) {
+          rememberPrompt(incomingPrompt.id);
+        } else if (clearedPromptId) {
+          rememberPrompt(clearedPromptId);
+        }
         renderSummary();
-        renderPrompt(message.interaction || null);
-        logLine(promptLogLine(message.interaction || null));
+        renderPrompt(incomingPrompt);
+        logLine(promptLogLine(incomingPrompt));
         return;
       }
       logLine(`Unhandled message ${message.type}`);
     };
   }
 
+  // startJoinPage keeps the lobby visible when the page is opened with a room code.
   async function startJoinPage(roomId) {
     lobbyPanel.classList.remove("hidden");
     gamePanel.classList.add("hidden");
@@ -1160,6 +1311,7 @@
     }
   }
 
+  // submitJoin either opens the live game view or restores the lobby if the join fails.
   async function submitJoin() {
     lobbyPanel.classList.add("hidden");
     gamePanel.classList.remove("hidden");
@@ -1178,6 +1330,7 @@
     }
   }
 
+  // loadRooms refreshes the list of live rooms shown on the landing page.
   async function loadRooms() {
     const response = await fetch("/api/rooms");
     const result = await response.json();
@@ -1212,6 +1365,7 @@
     });
   }
 
+  // copyText pushes room links and codes to the clipboard when possible.
   async function copyText(value, message) {
     try {
       await navigator.clipboard.writeText(value);
@@ -1263,3 +1417,5 @@
 </script>
 </body>
 </html>
+
+

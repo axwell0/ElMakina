@@ -1,156 +1,65 @@
+// messages.go defines the wire-format structs for WebSocket messages.
+//
+// Every struct here maps 1:1 to a JSON object the browser sends or receives.
+// Each message has a Type field as a discriminator — the browser reads Type first
+// to know which handler to route it to, then decodes the rest of the fields.
+//
+// # Flow overview
+//
+// Browser → Server (inbound):
+//
+//	incomingEnvelope (helpers.go)  — raw envelope; Type decoded first
+//	    ├── CommandEnvelopeMessage  — player submits a game command
+//	    ├── SubmitReadyMessage      — player marks themselves ready
+//	    └── SubmitStartMessage      — leader starts the match
+//
+// Server → Browser (outbound):
+//
+//	PromptEnvelope                  — prompt opened or cleared
+//	api.RoomSyncView                — full room snapshot (in internal/api)
+//	api.TurnResultView              — completed turn summary (in internal/api)
+//	api.GameOverView                — game finished (in internal/api)
+//
+// The split between this file and internal/api is intentional:
+// structs here are WebSocket-specific; structs in internal/api are shared
+// between WebSocket and HTTP responses.
 package ws
 
-// MessageType identifies the kind of websocket message being sent or received.
-type MessageType string
+import api "github.com/axwell0/elmakina/internal/api"
 
-const (
-	TypeRoomSync     MessageType = "room.sync"
-	TypePrompt       MessageType = "prompt"
-	TypeTurnResult   MessageType = "turn.result"
-	TypeGameOver     MessageType = "game.over"
-	TypeCommand      MessageType = "command"
-	TypeSubmitReady  MessageType = "room.ready"
-	TypeSubmitStart  MessageType = "room.start"
-)
-
-// PromptEnvelope is the canonical live-prompt message family.
+// PromptEnvelope carries the currently answerable prompt, if one is open.
+// When Prompt is non-nil, the browser should render the prompt UI.
+// When ClearedPromptID is set and Prompt is nil, the browser should hide any
+// prompt with that ID (the engine moved on).
 type PromptEnvelope struct {
-	Type        MessageType          `json:"type"`
-	Interaction InteractionWireState `json:"interaction"`
+	Type            api.MessageType `json:"type"`
+	Prompt          *api.PromptView `json:"prompt"`
+	ClearedPromptID string          `json:"clearedPromptId,omitempty"`
 }
 
-// InteractionWireState is the websocket-safe interaction shape.
-type InteractionWireState struct {
-	ID         string         `json:"id"`
-	Kind       string         `json:"kind"`
-	Recipients []int          `json:"recipients"`
-	Payload    map[string]any `json:"payload"`
-}
-
-// CommandEnvelopeMessage is the canonical inbound command message.
+// CommandEnvelopeMessage is the inbound command message sent by the browser when the
+// player submits a response to a prompt (e.g. chooses an action, picks a card).
+//
+// PromptID links this response back to the specific prompt that triggered it —
+// the server uses it to reject stale responses from a previous prompt.
+//
+// Payload is map[string]any because different commands have different shapes.
+// The server decodes it into the concrete type based on Kind.
 type CommandEnvelopeMessage struct {
-	Type          MessageType     `json:"type"`
-	InteractionID string          `json:"interactionId"`
-	Kind          string          `json:"kind"`
-	Payload       map[string]any  `json:"payload"`
-}
-
-// ActionPayloadMessage mirrors the action payload sent from the browser.
-type ActionPayloadMessage struct {
-	TargetIndex *int   `json:"targetIndex,omitempty"`
-	Guess       string `json:"guess,omitempty"`
-}
-
-// ActionMessage is the wire format for a player action.
-type ActionMessage struct {
-	ID         string               `json:"id"`
-	ActorIndex int                  `json:"actorIndex"`
-	MainAction string               `json:"mainAction,omitempty"`
-	Payload    ActionPayloadMessage `json:"payload,omitempty"`
-}
-
-// MatchSummaryMessage is the public match snapshot shared with every player.
-type MatchSummaryMessage struct {
-	TurnNumber         int                    `json:"turnNumber"`
-	CurrentPlayerIndex int                    `json:"currentPlayerIndex"`
-	Players            []PlayerSummaryMessage `json:"players"`
-}
-
-// PlayerSummaryMessage is the public row shown for each player in the room.
-type PlayerSummaryMessage struct {
-	PlayerIndex int    `json:"playerIndex"`
-	Name        string `json:"name"`
-	Coins       int    `json:"coins"`
-	Cards       int    `json:"cards"`
-	Eliminated  bool   `json:"eliminated"`
-}
-
-// PrivateCardMessage reveals a card only to its owner.
-type PrivateCardMessage struct {
-	ID   int    `json:"id"`
-	Role string `json:"role"`
-}
-
-// RoomViewMessage is the public room-state payload displayed in the UI.
-type RoomViewMessage struct {
-	Phase             string `json:"phase"`
-	LeaderPlayerIndex int    `json:"leaderPlayerIndex"`
-	PlayerCount       int    `json:"playerCount"`
-	JoinedPlayers     int    `json:"joinedPlayers"`
-	ConnectedPlayers  []int  `json:"connectedPlayers"`
-	ReadyPlayers      []int  `json:"readyPlayers"`
-	CanStart          bool   `json:"canStart"`
-	CanRestart        bool   `json:"canRestart"`
-	CanDelete         bool   `json:"canDelete"`
-}
-
-// RoomSyncMessage is the full client snapshot sent whenever room state changes.
-type RoomSyncMessage struct {
-	Type              MessageType          `json:"type"`
-	RoomID            string               `json:"roomId"`
-	PlayerIndex       int                  `json:"playerIndex"`
-	PlayerName        string               `json:"playerName"`
-	StatusTitle       string               `json:"statusTitle,omitempty"`
-	StatusDescription string               `json:"statusDescription,omitempty"`
-	Room              RoomViewMessage      `json:"room"`
-	Summary           MatchSummaryMessage  `json:"summary"`
-	Hand              []PrivateCardMessage `json:"hand,omitempty"`
-}
-
-// ChallengeResultMessage reports the outcome of a challenge to the UI.
-type ChallengeResultMessage struct {
-	Success         bool     `json:"success"`
-	ActionAllowed   bool     `json:"actionAllowed"`
-	ActorIndex      int      `json:"actorIndex"`
-	ChallengerIndex int      `json:"challengerIndex"`
-	ClaimedRole     string   `json:"claimedRole"`
-	Outcome         string   `json:"outcome"`
-	Logs            []string `json:"logs,omitempty"`
-	LostCardRole    string   `json:"lostCardRole,omitempty"`
-	LostPlayerIndex *int     `json:"lostPlayerIndex,omitempty"`
-}
-
-// CounterResultMessage reports the outcome of a counter action.
-type CounterResultMessage struct {
-	Action    *ActionMessage          `json:"action,omitempty"`
-	Applied   bool                    `json:"applied"`
-	Canceled  bool                    `json:"canceled"`
-	Challenge *ChallengeResultMessage `json:"challenge,omitempty"`
-}
-
-// TurnResultMessage is the full payload sent when a turn finishes.
-type TurnResultMessage struct {
-	Type             MessageType              `json:"type"`
-	RoomID           string                   `json:"roomId"`
-	TurnNumber       int                      `json:"turnNumber"`
-	Main             *ActionMessage           `json:"main,omitempty"`
-	MainApplied      bool                     `json:"mainApplied"`
-	MainCanceled     bool                     `json:"mainCanceled"`
-	Logs             []string                 `json:"logs,omitempty"`
-	PrivateLogs      []string                 `json:"privateLogs,omitempty"`
-	CounterResults   []CounterResultMessage   `json:"counterResults,omitempty"`
-	ChallengeResults []ChallengeResultMessage `json:"challengeResults,omitempty"`
-	Summary          MatchSummaryMessage      `json:"summary"`
-	Hand             []PrivateCardMessage     `json:"hand,omitempty"`
-}
-
-// GameOverMessage tells clients who won the match.
-type GameOverMessage struct {
-	Type        MessageType         `json:"type"`
-	RoomID      string              `json:"roomId"`
-	WinnerIndex int                 `json:"winnerIndex"`
-	WinnerName  string              `json:"winnerName"`
-	Summary     MatchSummaryMessage `json:"summary"`
+	Type     api.MessageType `json:"type"`
+	PromptID string          `json:"promptId"`
+	Kind     string          `json:"kind"`
+	Payload  map[string]any  `json:"payload"`
 }
 
 // SubmitReadyMessage marks a player as ready in the lobby.
 type SubmitReadyMessage struct {
-	Type   MessageType `json:"type"`
-	RoomID string      `json:"roomId"`
+	Type   api.MessageType `json:"type"`
+	RoomID string          `json:"roomId"`
 }
 
 // SubmitStartMessage asks the leader to start the room.
 type SubmitStartMessage struct {
-	Type   MessageType `json:"type"`
-	RoomID string      `json:"roomId"`
+	Type   api.MessageType `json:"type"`
+	RoomID string          `json:"roomId"`
 }

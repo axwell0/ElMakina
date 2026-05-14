@@ -13,7 +13,7 @@ type Deck []Card
 // Draw removes and returns n cards from the front of the deck.
 func (d *Deck) Draw(n int) ([]Card, error) {
 	if n < 0 {
-		return nil, fmt.Errorf("draw count %d is invalid", n)
+		return nil, fmt.Errorf("%w: %d", errInvalidDrawCount, n)
 	}
 	if n > len(*d) {
 		return nil, fmt.Errorf("draw %d cards from deck with %d cards: %w", n, len(*d), apperrors.ErrDeckExhausted)

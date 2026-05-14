@@ -1,0 +1,30 @@
+package actions
+
+import "errors"
+
+var (
+	errActionContextNil        = errors.New("action context is nil")
+	errCardSelectionOptions    = errors.New("card selection step is missing card options")
+	errCommandNil              = errors.New("command is nil")
+	errCounterNotAllowed       = errors.New("counter action cannot counter main action")
+	errDuplicateCardIndex      = errors.New("duplicate card index")
+	errInvalidCardIndex        = errors.New("invalid card index")
+	errInvalidContinuation     = errors.New("invalid continuation state")
+	errInvalidPlayerIndex      = errors.New("invalid player index")
+	errInvalidResponse         = errors.New("invalid response")
+	errMissingContinuation     = errors.New("missing continuation state")
+	errNoCardsToExchange       = errors.New("no cards to exchange")
+	errNoTaxableOpponent       = errors.New("no players have 7+ coins to tax")
+	errNotEnoughCoins          = errors.New("not enough coins")
+	errPayloadNotAllowed       = errors.New("payload is not allowed for this action")
+	errStateNil                = errors.New("state is nil")
+	errStepContinuationNil     = errors.New("step continuation is nil")
+	errStepNil                 = errors.New("step is nil")
+	errTargetEliminated        = errors.New("target is eliminated")
+	errTargetHasNoCards        = errors.New("target has no cards")
+	errTargetHasTooFewCoins    = errors.New("target has too few coins")
+	errUnknownAction           = errors.New("unknown action")
+	errUnknownStepKind         = errors.New("unknown step kind")
+	errUnsupportedPayloadShape = errors.New("unsupported payload shape")
+	errWrongActionKind         = errors.New("wrong action kind")
+)

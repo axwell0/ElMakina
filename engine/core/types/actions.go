@@ -1,51 +1,35 @@
 package types
 
-// Action is the custom type of every allowed action in the game.
-type Action string
+type ActionID string
 
 const (
-	Business         Action = "business"
-	Exchange         Action = "exchange"
-	Escape           Action = "escape"
-	Income           Action = "income"
-	ForeignAid       Action = "foreign_aid"
-	Coup             Action = "coup"
-	Tax              Action = "tax"
-	Investigate      Action = "investigate"
-	Accuse           Action = "accuse"
-	Assassinate      Action = "assassinate"
-	Steal            Action = "steal"
-	BlockSteal       Action = "block_steal"
-	BlockTerrorist   Action = "block_terrorist"
-	BlockPolice      Action = "block_investigate"
-	BlockForeignAid  Action = "block_foreign_aid"
-	TaxBusinessWoman Action = "business_tax"
-	Pass             Action = "pass" // Pass means "do nothing."
+	Income           ActionID = "income"
+	ForeignAid       ActionID = "foreign_aid"
+	Tax              ActionID = "tax"
+	Business         ActionID = "business"
+	Steal            ActionID = "steal"
+	Assassinate      ActionID = "assassinate"
+	Coup             ActionID = "coup"
+	Exchange         ActionID = "exchange"
+	Investigate      ActionID = "investigate"
+	Accuse           ActionID = "accuse"
+	Escape           ActionID = "escape"
+	BlockSteal       ActionID = "block_steal"
+	BlockTerrorist   ActionID = "block_terrorist"
+	BlockPolice      ActionID = "block_investigate"
+	BlockForeignAid  ActionID = "block_foreign_aid"
+	TaxBusinessWoman ActionID = "business_tax"
+	Pass             ActionID = "pass"
 )
 
-// Actions Represents all the actions available in the game engine.
-var Actions = []Action{
-	Business,
-	Exchange,
-	Escape,
-	Income,
-	ForeignAid,
-	Coup,
-	Tax,
-	Investigate,
-	Accuse,
-	Assassinate,
-	Steal,
-	BlockSteal,
-	BlockTerrorist,
-	BlockPolice,
-	BlockForeignAid,
-	TaxBusinessWoman,
-	Pass,
-}
-
+// PlayerAction is the engine's canonical command: "player X wants to do Y".
+//
+// It is created by the input layer (session/app) from the browser's raw command
+// and passed into ApplyAction / ResumeAction.  Payload carries extra data only
+// for actions that need a target or guess; it is nil for untargeted actions like
+// Income or Tax.
 type PlayerAction struct {
-	Action     Action        // Action to execute.
-	ActorIndex int           // Player index in GameState.Players.
-	Payload    ActionPayload // Action-specific data, if any.
+	Action     ActionID      // which action to execute (see ActionID constants above)
+	ActorIndex int           // zero-based index into GameState.Players
+	Payload    ActionPayload // nil for untargeted actions; TargetPayload or AccusePayload otherwise
 }

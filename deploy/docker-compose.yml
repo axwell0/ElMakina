@@ -1,0 +1,64 @@
+# File: deploy/docker-compose.yml
+# Purpose: Documents the local and production deployment topology for the project.
+services:
+  postgres:
+    image: postgres:17.4
+    environment:
+      POSTGRES_USER: elmakina
+      POSTGRES_PASSWORD: elmakina
+      POSTGRES_DB: elmakina
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ..
+      dockerfile: deploy/dockerfiles/backend.Dockerfile
+      target: dev
+    env_file:
+      - env/backend.dev.env
+    ports:
+      - '8080:8080'
+    volumes:
+      - ..:/repo
+      - ./data:/data
+      - go_mod_cache:/go/pkg/mod
+      - go_build_cache:/root/.cache/go-build
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '--quiet', '--tries=1', '--spider', 'http://localhost:8080/ready']
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/dockerfiles/web.Dockerfile
+      target: dev
+    env_file:
+      - env/web.dev.env
+    ports:
+      - '3000:3000'
+    volumes:
+      - ./web:/repo/web
+      - web_node_modules:/repo/web/node_modules
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  go_mod_cache:
+  go_build_cache:
+  web_node_modules:

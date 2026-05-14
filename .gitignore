@@ -3,9 +3,10 @@
 .idea
 node_modules
 .vscode
-go.sum
 bun.lock
 .env
 .husky
 .next
 .bun
+.codex/bin/
+.codex/logs/

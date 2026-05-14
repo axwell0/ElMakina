@@ -1,0 +1,198 @@
+version: "2"
+
+run:
+  timeout: 5m
+  go: '1.26.2'
+  tests: true
+  modules-download-mode: readonly
+
+linters:
+  default: none
+  enable:
+    - govet
+    - staticcheck
+    - errchkjson
+    - ineffassign
+    - unused
+    - nilerr
+    - nilnil
+    - nilnesserr
+    - unconvert
+    - unparam
+
+    - err113
+    - wrapcheck
+    - errname
+    - noctx
+    - contextcheck
+    - containedctx
+    - bodyclose
+    - rowserrcheck
+    - sqlclosecheck
+    - spancheck
+
+    - gosec
+    - bidichk
+    - asciicheck
+    - forbidigo
+    - predeclared
+    - reassign
+
+    - revive
+    - gocritic
+    - gocognit
+    - cyclop
+    - nestif
+    - maintidx
+    - nakedret
+    - dogsled
+    - interfacebloat
+    - iface
+    - inamedparam
+    - forcetypeassert
+    - copyloopvar
+    - wastedassign
+    - makezero
+    - usestdlibvars
+    - whitespace
+    - godot
+    - nolintlint
+
+    - loggercheck
+    - sloglint
+    - testifylint
+    - thelper
+    - tparallel
+    - usetesting
+
+  settings:
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+
+    govet:
+      enable-all: true
+      disable:
+        - fieldalignment
+
+    revive:
+      severity: warning
+      rules:
+        - name: blank-imports
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: dot-imports
+        - name: error-return
+        - name: error-strings
+        - name: error-naming
+        - name: exported
+          disabled: true
+        - name: if-return
+        - name: increment-decrement
+        - name: indent-error-flow
+        - name: range
+        - name: receiver-naming
+        - name: redefines-builtin-id
+        - name: superfluous-else
+        - name: time-naming
+        - name: unexported-return
+        - name: unreachable-code
+        - name: unused-parameter
+        - name: var-declaration
+        - name: var-naming
+
+    gocognit:
+      min-complexity: 18
+
+    cyclop:
+      max-complexity: 12
+
+    nestif:
+      min-complexity: 5
+
+    maintidx:
+      under: 20
+
+    nakedret:
+      max-func-lines: 10
+
+    interfacebloat:
+      max: 5
+
+    dogsled:
+      max-blank-identifiers: 2
+
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - performance
+        - style
+      disabled-checks:
+        - hugeParam
+        - rangeValCopy
+
+    forbidigo:
+      forbid:
+        - pattern: '^print(ln)?$'
+          msg: use structured logging or return errors instead of print/println
+        - pattern: '^fmt\.Print.*$'
+          msg: avoid ad-hoc stdout logging outside cmd packages
+        - pattern: '^spew\.(ConfigState\.)?Dump$'
+          msg: do not commit debug dumps
+
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+      allow-unused: false
+
+    sloglint:
+      no-global: all
+      context: all
+
+  exclusions:
+    generated: strict
+    warn-unused: true
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - path: '(.+)_test\.go'
+        linters:
+          - err113
+          - wrapcheck
+          - gosec
+          - gocognit
+          - cyclop
+          - maintidx
+          - dupl
+      - path: '^cmd/'
+        linters:
+          - forbidigo
+      - path: '(.+)_test\.go'
+        text: 'use of `fmt\.Print'
+        linters:
+          - forbidigo
+
+formatters:
+  enable:
+    - gofmt
+    - gofumpt
+    - goimports
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+output:
+  formats:
+    text:
+      path: stdout
+      print-linter-name: true
+      print-issued-lines: true
+      colors: true
+  sort-order:
+    - file
+    - linter
+    - severity
