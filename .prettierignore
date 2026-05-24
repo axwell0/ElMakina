@@ -1,0 +1,26 @@
+# File: .prettierignore
+# Purpose: Tells Prettier which generated or noisy files to leave untouched.
+# Dependencies
+node_modules/
+bun.lock
+
+# Build outputs
+.next/
+dist/
+build/
+web/.next/
+web/dist/
+
+# Generated files
+web/src/network/ws-contract.ts
+web/src/network/ws-schema.json
+shared/schemas/envelope.json
+
+# Coverage
+coverage/
+*.log
+
+# Misc
+.DS_Store
+.env*
+!.env.example
