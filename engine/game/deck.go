@@ -14,7 +14,7 @@ func (d *Deck) Draw(n int) ([]Card, error) {
 	if n > len(*d) {
 		return nil, fmt.Errorf("draw %d cards from deck with %d cards", n, len(*d))
 	}
-	drawn := (*d)[:n]
+	drawn := (*d)[:n:n]
 	*d = (*d)[n:]
 	return drawn, nil
 }
